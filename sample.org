@@ -1,0 +1,26 @@
+#+ANKI_DECK: org-anki
+
+The deck name above you need to add, but the ANKI_NOTE_ID's in the
+property drawers are added by this package (given to us in AnkiConnect
+responses as the notes are created).
+
+* Heading 1
+:PROPERTIES:
+:ANKI_NOTE_ID: 1606926919865
+:END:
+Content 1
+** Subheading 1
+:PROPERTIES:
+:ANKI_NOTE_ID: 1606926920966
+:END:
+Subcontent 1
+*** Sub-subcontent 1
+:PROPERTIES:
+:ANKI_NOTE_ID: 1606926922141
+:END:
+Sub-subcontent 1
+* Heading 2
+:PROPERTIES:
+:ANKI_NOTE_ID: 1606926923290
+:END:
+Content 2

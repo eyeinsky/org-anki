@@ -1,0 +1,57 @@
+* org-anki
+Minor mode to synchronize your org-mode entries to Anki.
+
+Works via [[https://foosoft.net/projects/anki-connect/][AnkiConnect]] add-on to [[https://apps.ankiweb.net/][Anki]].[fn:1]
+
+Creates "Basic" type of cords, heading of org entry is set as front,
+text content until next heading is set as back[fn:2]. See [[https://raw.githubusercontent.com/eyeinsky/org-anki/master/sample.org][sample.org]]
+for how it looks like after all entries are synced to Anki.
+
+Exposes these commands:
+- =anki-sync-entry= :: adds or updates the current org-entry under
+     cursor
+- =anki-delete-entry= :: deletes entry from Anki. Entry must have
+     =ANKI_NOTE_ID= property
+
+* Setup
+- Start Anki with AnkiConnect installed
+- Add =#+ANKI_DECK: my-target-deck= to top of the .org file
+- Run =anki-sync-entry= on some heading with content
+
+Note: the card browser must be closed while synchronizing, as it won't
+update the note otherwise ([[https://github.com/FooSoft/anki-connect/issues/82][issue]]).
+
+You probably want to bind =anki-sync-entry= to a key sequence, but not
+=anki-delete-entry= -- as accidentally deleting notes will become too
+easy.
+
+In any case, don't forget to create backups, as deleting notes will
+lose their scheduling information.
+* Why
+.. as there are [[https://github.com/louietan/anki-editor][anki-editor]], [[https://github.com/abo-abo/pamparam][pamparam]], [[https://gitlab.com/phillord/org-drill][org-drill]], [[https://github.com/l3kn/org-fc][org-fc]]?
+
+Anki-editor requires subheadings for fields, so existing .org notes
+need to be modified to be ankified.
+
+The other three are emacs or org-mode only[fn:3], so no spaced repetition
+from your phone or web.
+* Todo
+- [ ] convert title and content to html when uploading
+- [ ] target deck: read target deck name until found from
+  1. entry property
+  2. global property
+  3. customized variable (i.e in =.emacs=)
+  4. library default
+- [ ] anki-sync-buffer: adds or updates all entries to Anki;
+- [ ] anki-delete-buffer: deletes all entries from Anki which have
+  =ANKI_NOTE_ID= property;
+
+* Footnotes
+
+[fn:1] AnkiConnect starts a HTTP server on localhost:8765 which the
+current package talks to.
+
+[fn:2] Even if the next heading is a sub-heading (you probably don't
+want subheadings in card contents anyway).
+
+[fn:3] I mean, do you really want to use thes just to use Anki?? :p
