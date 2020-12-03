@@ -128,9 +128,11 @@
 
 ;; Public API, i.e commands what the org-anki user should use:
 
-;; Sync single entry
 ;;;###autoload
 (defun anki-sync-entry ()
+  "Synchronize single entry. Tries to add, or update if id
+property exists, the note."
+
   (interactive)
   (let* ((front    (org-entry-get nil "ITEM"))
          (maybe-id (org-entry-get nil anki-prop-note-id))
@@ -162,9 +164,11 @@
              (org-set-property anki-prop-note-id (number-to-string the-result)))
             (t (message "Empty response"))))))))))
 
-;; Delete entry under cursor -- will lose history so be careful
 ;;;###autoload
 (defun anki-delete-entry ()
+  "Delete org entry under cursor. The id property needs to exist.
+
+Will lose scheduling data so be careful"
   (interactive)
   (let*
       ((note-id (string-to-number (org-entry-get nil anki-prop-note-id))))
