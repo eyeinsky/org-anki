@@ -68,7 +68,6 @@ Default NAME is \"PROPERTY\", default BUFFER the current buffer."
   "Perform HTTP GET request to AnkiConnect's default http://localhost:8765.
 
 BODY is the alist json payload, CALLBACK the function to call with result."
-  (message (json-encode body))
   (request
     "http://localhost:8765" ; This is where AnkiConnect add-on listens.
     :type "GET"
@@ -157,10 +156,9 @@ Tries to add, or update if id property exists, the note."
        (org-anki--update-note maybe-id front back)
        (lambda (arg)
          (let ((the-error (assoc-default 'error arg)))
-           (when the-error
-             (message
-              "Couldn't update note, received error: %s"
-              the-error))))))
+           (if the-error
+               (message "Couldn't update note, received error: %s" the-error)
+             (message "org-anki says: note succesfully updated!"))))))
      ;; id property doesn't exist, try to create new
      (t
       (org-anki-connect-request
@@ -170,10 +168,12 @@ Tries to add, or update if id property exists, the note."
                (the-result (assoc-default 'result arg)))
            (cond
             (the-error
-             (message "Couldn't add note, received error: %s" the-error))
+             (error "Couldn't add note, received error: %s" the-error))
             (the-result
-             (org-set-property org-anki-prop-note-id (number-to-string the-result)))
-            (t (message "Empty response"))))))))))
+             (org-set-property org-anki-prop-note-id (number-to-string the-result))
+             (message "org-anki says: note succesfully added!"))
+            (t
+             (error "Empty response, it should return new note's id."))))))))))
 
 ;;;###autoload
 (defun org-anki-delete-entry ()
@@ -189,9 +189,10 @@ Will lose scheduling data so be careful"
        (let ((the-error (assoc-default 'error arg)))
          (cond
           (the-error
-           (message "Couldn't delete note, received error: %s" the-error))
+           (error "Couldn't delete note, received error: %s" the-error))
           (t
-           (org-delete-property org-anki-prop-note-id))))))))
+           (org-delete-property org-anki-prop-note-id)
+           (message "org-anki says: note successfully deleted!"))))))))
 
 
 ;; Helpers for development, don't use
