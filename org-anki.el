@@ -47,20 +47,27 @@
 ;;
 ;; From:
 ;;   https://emacs.stackexchange.com/questions/21713/how-to-get-property-values-from-org-file-headers
-(defun org-anki--global-props (&optional property buffer)
-  "Get the plists of global org properties of current buffer."
-  (unless property (setq property "PROPERTY"))
+(defun org-anki--global-props (&optional name buffer)
+  "Get the plists of global org properties by NAME in BUFFER.
+
+Default NAME is \"PROPERTY\", default BUFFER the current buffer."
+  (unless name (setq name "PROPERTY"))
   (with-current-buffer (or buffer (current-buffer))
     (org-element-map (org-element-parse-buffer) 'keyword
-      (lambda (el) (when (string-match property (org-element-property :key el)) el))
+      (lambda (el) (when (string-match name (org-element-property :key el)) el))
       nil t)))
 
-(defun org-anki--get-global-prop (key) (plist-get (car (cdr (org-anki--global-props key))) :value))
+(defun org-anki--get-global-prop (name)
+  "Get global property by NAME."
+  (plist-get (car (cdr (org-anki--global-props name))) :value))
 
 
 ;; Talk to AnkiConnect API:
 
 (defun org-anki-connect-request (body callback)
+  "Perform HTTP GET request to AnkiConnect's default http://localhost:8765.
+
+BODY is the alist json payload, CALLBACK the function to call with result."
   (message (json-encode body))
   (request
     "http://localhost:8765" ; This is where AnkiConnect add-on listens.
@@ -81,11 +88,13 @@
        (funcall callback data)))))
 
 (defun org-anki--body (action params)
+  "Wrap ACTION and PARAMS to a json payload AnkiConnect expects."
   `(("version" . 6)
     ("action" . ,action)
     ("params" . ,params)))
 
 (defun org-anki--create-note (front back deck)
+  "Create an `addNote' json structure to be added to DECK with card FRONT and BACK strings."
   (org-anki--body
    "addNote"
    `(("note" .
@@ -99,6 +108,7 @@
          ("duplicateScope" . "deck"))))))))
 
 (defun org-anki--update-note (id new-front new-back)
+  "Create an `updateNoteFields' json structure with integer ID, and NEW-FRONT and NEW-BACK strings."
   (org-anki--body
    "updateNoteFields"
    `(("note" .
@@ -107,13 +117,14 @@
        ("fields" . (("Front" . ,new-front) ("Back" . ,new-back))))))))
 
 (defun org-anki--delete-notes (ids)
+  "Create an `deleteNotes' json structure with integer IDS list."
   (org-anki--body "deleteNotes" `(("notes" . ,ids))))
 
 
 ;; Get card content from org-mode:
 
-;; Entry content: until any next heading
 (defun org-anki--entry-content-until-any-heading ()
+  "Get entry content until any next heading."
   ;; We move around with regexes, so restore original position
   (save-excursion
     ;; Jump to beginning of entry
@@ -130,8 +141,8 @@
 
 ;;;###autoload
 (defun org-anki-sync-entry ()
-  "Synchronize single entry. Tries to add, or update if id
-property exists, the note."
+  "Synchronize single entry.
+Tries to add, or update if id property exists, the note."
 
   (interactive)
   (let* ((front    (org-entry-get nil "ITEM"))
@@ -166,7 +177,7 @@ property exists, the note."
 
 ;;;###autoload
 (defun org-anki-delete-entry ()
-  "Delete org entry under cursor. The id property needs to exist.
+  "Delete org entry under cursor (the id property must exist).
 
 Will lose scheduling data so be careful"
   (interactive)
@@ -186,18 +197,21 @@ Will lose scheduling data so be careful"
 ;; Helpers for development, don't use
 
 (defun org-anki--sync-entry-debug ()
+  "Debug command which reloads package before running."
   (interactive)
   (message "org-anki-sync-entry-debug")
   (eval-buffer "org-anki.el")
   (org-anki-sync-entry))
 
 (defun org-anki--delete-entry-debug ()
+  "Debug command which reloads package before running."
   (interactive)
   (message "org-anki-delete-entry-debug")
   (eval-buffer "org-anki.el")
   (org-anki-delete-entry))
 
 (defun org-anki--debug-bind ()
+  "Define keys for testing."
   (define-key org-mode-map (kbd "C-c C-c") 'org-anki--sync-entry-debug)
   (define-key org-mode-map (kbd "C-d C-d") 'org-anki--delete-entry-debug))
 
