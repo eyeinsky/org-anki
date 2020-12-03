@@ -3,9 +3,10 @@ Minor mode to synchronize your org-mode entries to Anki.
 
 Works via [[https://foosoft.net/projects/anki-connect/][AnkiConnect]] add-on to [[https://apps.ankiweb.net/][Anki]].[fn:1]
 
-Creates "Basic" type of cords, heading of org entry is set as front,
-text content until next heading is set as back[fn:2]. See [[https://raw.githubusercontent.com/eyeinsky/org-anki/master/sample.org][sample.org]]
-for how it looks like after all entries are synced to Anki.
+Creates "Basic" type of cards, heading of org entry is set as front,
+text content until next heading is set as the back of the
+card[fn:2]. See [[https://raw.githubusercontent.com/eyeinsky/org-anki/master/sample.org][sample.org]] for how it looks like after all entries are
+synced to Anki.
 
 Exposes these commands:
 - =org-anki-sync-entry= :: adds or updates the current org-entry under
@@ -51,7 +52,7 @@ from your phone or web.
 [fn:1] AnkiConnect starts a HTTP server on localhost:8765 which the
 current package talks to.
 
-[fn:2] Even if the next heading is a sub-heading (you probably don't
-want subheadings in card contents anyway).
+[fn:2] It does this even if the next heading is a sub-heading (you
+probably don't want subheadings in card contents anyway).
 
 [fn:3] I mean, do you really want to use thes just to use Anki?? :p
