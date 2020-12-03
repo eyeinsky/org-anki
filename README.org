@@ -8,12 +8,12 @@ text content until next heading is set as back[fn:2]. See [[https://raw.githubus
 for how it looks like after all entries are synced to Anki.
 
 Exposes these commands:
-- =anki-sync-entry= :: adds or updates the current org-entry under
+- =org-anki-sync-entry= :: adds or updates the current org-entry under
      cursor
-- =anki-delete-entry= :: deletes entry from Anki. Entry must have
+- =org-anki-delete-entry= :: deletes entry from Anki. Entry must have
      =ANKI_NOTE_ID= property
 
-* Setup
+** Setup
 - Start Anki with AnkiConnect installed
 - Add =#+ANKI_DECK: my-target-deck= to top of the .org file
 - Run =anki-sync-entry= on some heading with content
@@ -27,7 +27,7 @@ easy.
 
 In any case, don't forget to create backups, as deleting notes will
 lose their scheduling information.
-* Why
+** Why
 .. as there are [[https://github.com/louietan/anki-editor][anki-editor]], [[https://github.com/abo-abo/pamparam][pamparam]], [[https://gitlab.com/phillord/org-drill][org-drill]], [[https://github.com/l3kn/org-fc][org-fc]]?
 
 Anki-editor requires subheadings for fields, so existing .org notes
@@ -35,7 +35,7 @@ need to be modified to be ankified.
 
 The other three are emacs or org-mode only[fn:3], so no spaced repetition
 from your phone or web.
-* Todo
+** Todo
 - [ ] convert title and content to html when uploading
 - [ ] target deck: read target deck name until found from
   1. entry property
@@ -46,7 +46,7 @@ from your phone or web.
 - [ ] anki-delete-buffer: deletes all entries from Anki which have
   =ANKI_NOTE_ID= property;
 
-* Footnotes
+** Footnotes
 
 [fn:1] AnkiConnect starts a HTTP server on localhost:8765 which the
 current package talks to.

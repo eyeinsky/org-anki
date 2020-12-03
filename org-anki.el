@@ -1,10 +1,12 @@
-;;; org-anki.el --- synchronize org-mode entries to Anki
-
+;;; org-anki.el --- Synchronize org-mode entries to Anki -*- lexical-binding: t -*-
+;;
+;; Copyright (C) 2020 Markus Läll
+;;
 ;; URL: https://github.com/eyeinsky/org-anki
 ;; Version: 0.0.1
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
-;; Package-Requires: ((emacs "24"))
+;; Package-Requires: ((emacs "24.3"))
 
 ;; This file is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -35,8 +37,8 @@
 
 ;; Constants
 
-(defconst anki-prop-note-id "ANKI_NOTE_ID")
-(defconst anki-prop-deck "ANKI_DECK")
+(defconst org-anki-prop-note-id "ANKI_NOTE_ID")
+(defconst org-anki-prop-deck "ANKI_DECK")
 
 
 ;; Stolen code
@@ -45,7 +47,7 @@
 ;;
 ;; From:
 ;;   https://emacs.stackexchange.com/questions/21713/how-to-get-property-values-from-org-file-headers
-(defun org-global-props (&optional property buffer)
+(defun org-anki--global-props (&optional property buffer)
   "Get the plists of global org properties of current buffer."
   (unless property (setq property "PROPERTY"))
   (with-current-buffer (or buffer (current-buffer))
@@ -53,12 +55,12 @@
       (lambda (el) (when (string-match property (org-element-property :key el)) el))
       nil t)))
 
-(defun anki--get-global-prop (key) (plist-get (car (cdr (org-global-props key))) :value))
+(defun org-anki--get-global-prop (key) (plist-get (car (cdr (org-anki--global-props key))) :value))
 
 
 ;; Talk to AnkiConnect API:
 
-(defun anki-connect-request (body callback)
+(defun org-anki-connect-request (body callback)
   (message (json-encode body))
   (request
     "http://localhost:8765" ; This is where AnkiConnect add-on listens.
@@ -70,22 +72,21 @@
 
     :error
     (cl-function
-     (lambda (&rest args)
-       (debug "Error response in variable 'args'")
-       ))
+     (lambda (&rest _args)
+       (debug "Error response in variable '_args'")))
 
     :success
     (cl-function
      (lambda (&key data &allow-other-keys)
        (funcall callback data)))))
 
-(defun anki--body (action params)
+(defun org-anki--body (action params)
   `(("version" . 6)
     ("action" . ,action)
     ("params" . ,params)))
 
-(defun anki--create-note (front back deck)
-  (anki--body
+(defun org-anki--create-note (front back deck)
+  (org-anki--body
    "addNote"
    `(("note" .
       (("deckName" . ,deck)
@@ -97,22 +98,22 @@
         (("allowDuplicate" . :json-false)
          ("duplicateScope" . "deck"))))))))
 
-(defun anki--update-note (id new-front new-back)
-  (anki--body
+(defun org-anki--update-note (id new-front new-back)
+  (org-anki--body
    "updateNoteFields"
    `(("note" .
       (("id" . ,id)
        ("deckName" . "org-mode")
        ("fields" . (("Front" . ,new-front) ("Back" . ,new-back))))))))
 
-(defun anki--delete-notes (ids)
-  (anki--body "deleteNotes" `(("notes" . ,ids))))
+(defun org-anki--delete-notes (ids)
+  (org-anki--body "deleteNotes" `(("notes" . ,ids))))
 
 
 ;; Get card content from org-mode:
 
 ;; Entry content: until any next heading
-(defun anki--entry-content-until-any-heading ()
+(defun org-anki--entry-content-until-any-heading ()
   ;; We move around with regexes, so restore original position
   (save-excursion
     ;; Jump to beginning of entry
@@ -122,28 +123,27 @@
     ;; Possibly skip property block until end of entry
     (re-search-forward ":properties:\\(.*\n\\)*:end:" (org-entry-end-position) t)
     ;; Get entry content
-    (buffer-substring-no-properties (point) (re-search-forward "\\([^*].*\n\\)*" nil t))
-    ))
+    (buffer-substring-no-properties (point) (re-search-forward "\\([^*].*\n\\)*" nil t))))
 
 
 ;; Public API, i.e commands what the org-anki user should use:
 
 ;;;###autoload
-(defun anki-sync-entry ()
+(defun org-anki-sync-entry ()
   "Synchronize single entry. Tries to add, or update if id
 property exists, the note."
 
   (interactive)
   (let* ((front    (org-entry-get nil "ITEM"))
-         (maybe-id (org-entry-get nil anki-prop-note-id))
-         (deck     (anki--get-global-prop anki-prop-deck))
-         (back     (anki--entry-content-until-any-heading)))
+         (maybe-id (org-entry-get nil org-anki-prop-note-id))
+         (deck     (org-anki--get-global-prop org-anki-prop-deck))
+         (back     (org-anki--entry-content-until-any-heading)))
 
     (cond
      ;; id property exists, update
      (maybe-id
-      (anki-connect-request
-       (anki--update-note maybe-id front back)
+      (org-anki-connect-request
+       (org-anki--update-note maybe-id front back)
        (lambda (arg)
          (let ((the-error (assoc-default 'error arg)))
            (when the-error
@@ -152,8 +152,8 @@ property exists, the note."
               the-error))))))
      ;; id property doesn't exist, try to create new
      (t
-      (anki-connect-request
-       (anki--create-note front back deck)
+      (org-anki-connect-request
+       (org-anki--create-note front back deck)
        (lambda (arg)
          (let ((the-error (assoc-default 'error arg))
                (the-result (assoc-default 'result arg)))
@@ -161,47 +161,45 @@ property exists, the note."
             (the-error
              (message "Couldn't add note, received error: %s" the-error))
             (the-result
-             (org-set-property anki-prop-note-id (number-to-string the-result)))
+             (org-set-property org-anki-prop-note-id (number-to-string the-result)))
             (t (message "Empty response"))))))))))
 
 ;;;###autoload
-(defun anki-delete-entry ()
+(defun org-anki-delete-entry ()
   "Delete org entry under cursor. The id property needs to exist.
 
 Will lose scheduling data so be careful"
   (interactive)
   (let*
-      ((note-id (string-to-number (org-entry-get nil anki-prop-note-id))))
-    (anki-connect-request
-     (anki--delete-notes `(,note-id))
+      ((note-id (string-to-number (org-entry-get nil org-anki-prop-note-id))))
+    (org-anki-connect-request
+     (org-anki--delete-notes `(,note-id))
      (lambda (arg)
        (let ((the-error (assoc-default 'error arg)))
          (cond
           (the-error
            (message "Couldn't delete note, received error: %s" the-error))
           (t
-           (org-delete-property anki-prop-note-id))))))))
+           (org-delete-property org-anki-prop-note-id))))))))
 
 
 ;; Helpers for development, don't use
 
-(defun anki--sync-entry-debug ()
+(defun org-anki--sync-entry-debug ()
   (interactive)
-  (message "anki-sync-entry-debug")
+  (message "org-anki-sync-entry-debug")
   (eval-buffer "org-anki.el")
-  (anki-sync-entry)
-  )
+  (org-anki-sync-entry))
 
-(defun anki--delete-entry-debug ()
+(defun org-anki--delete-entry-debug ()
   (interactive)
-  (message "anki-delete-entry-debug")
+  (message "org-anki-delete-entry-debug")
   (eval-buffer "org-anki.el")
-  (anki-delete-entry)
-  )
+  (org-anki-delete-entry))
 
-(defun anki--debug-bind ()
-  (define-key org-mode-map (kbd "C-c C-c") 'anki--sync-entry-debug)
-  (define-key org-mode-map (kbd "C-d C-d") 'anki--delete-entry-debug)
-  )
+(defun org-anki--debug-bind ()
+  (define-key org-mode-map (kbd "C-c C-c") 'org-anki--sync-entry-debug)
+  (define-key org-mode-map (kbd "C-d C-d") 'org-anki--delete-entry-debug))
 
 (provide 'org-anki)
+;;; org-anki.el ends here
