@@ -129,6 +129,7 @@
 ;; Public API, i.e commands what the org-anki user should use:
 
 ;; Sync single entry
+;;;###autoload
 (defun anki-sync-entry ()
   (interactive)
   (let* ((front    (org-entry-get nil "ITEM"))
@@ -162,6 +163,7 @@
             (t (message "Empty response"))))))))))
 
 ;; Delete entry under cursor -- will lose history so be careful
+;;;###autoload
 (defun anki-delete-entry ()
   (interactive)
   (let*
