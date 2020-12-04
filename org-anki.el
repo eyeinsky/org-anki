@@ -6,7 +6,7 @@
 ;; Version: 0.0.1
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
-;; Package-Requires: ((emacs "24.3") (request "0.3.2"))
+;; Package-Requires: ((emacs "24.3") (request "0.3.2") (ox-slimhtml "0.4.1"))
 
 ;; This file is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -35,6 +35,7 @@
 (require 'org)
 (require 'request)
 (require 'org-element)
+(require 'ox-slimhtml)
 
 ;; Constants
 
@@ -136,6 +137,9 @@ BODY is the alist json payload, CALLBACK the function to call with result."
     ;; Get entry content
     (buffer-substring-no-properties (point) (re-search-forward "\\([^*].*\n\\)*" nil t))))
 
+(defun org-anki--string-to-html (string)
+  "Convert STRING (org element heading or content) to html."
+  (org-export-string-as string 'slimhtml t nil))
 
 ;; Public API, i.e commands what the org-anki user should use:
 
@@ -145,10 +149,10 @@ BODY is the alist json payload, CALLBACK the function to call with result."
 Tries to add, or update if id property exists, the note."
 
   (interactive)
-  (let* ((front    (org-entry-get nil "ITEM"))
+  (let* ((front    (org-anki--string-to-html (org-entry-get nil "ITEM")))
          (maybe-id (org-entry-get nil org-anki-prop-note-id))
          (deck     (org-anki--get-global-prop org-anki-prop-deck))
-         (back     (org-anki--entry-content-until-any-heading)))
+         (back     (org-anki--string-to-html (org-anki--entry-content-until-any-heading))))
 
     (cond
      ;; id property exists, update
