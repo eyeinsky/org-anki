@@ -141,6 +141,11 @@ BODY is the alist json payload, CALLBACK the function to call with result."
   "Convert STRING (org element heading or content) to html."
   (org-export-string-as string 'slimhtml t nil))
 
+(defun org-anki--report-error (format error)
+  "FORMAT the ERROR and prefix it with `org-anki error'."
+  (let ((fmt0 (concat "org-anki error: " format)))
+    (message fmt0 error)))
+
 ;; Public API, i.e commands what the org-anki user should use:
 
 ;;;###autoload
@@ -162,7 +167,9 @@ Tries to add, or update if id property exists, the note."
        (lambda (arg)
          (let ((the-error (assoc-default 'error arg)))
            (if the-error
-               (message "Couldn't update note, received error: %s" the-error)
+               (org-anki--report-error
+                "Couldn't update note, received: %s"
+                the-error)
              (message "org-anki says: note succesfully updated!"))))))
      ;; id property doesn't exist, try to create new
      (t
@@ -173,12 +180,15 @@ Tries to add, or update if id property exists, the note."
                (the-result (assoc-default 'result arg)))
            (cond
             (the-error
-             (message "org-anki error: couldn't add note, received error: %s" the-error))
+             (org-anki--report-error
+              "Couldn't add note, received error: %s"
+              the-error))
             (the-result
              (org-set-property org-anki-prop-note-id (number-to-string the-result))
              (message "org-anki says: note succesfully added!"))
             (t
-             (message "org-anki error: empty response, it should return new note's id."))))))))))
+             (org-anki--report-error "%s"
+              "Empty response, it should return new note's id."))))))))))
 
 ;;;###autoload
 (defun org-anki-delete-entry ()
