@@ -17,6 +17,7 @@ Exposes these commands:
 ** Setup
 - Start Anki with AnkiConnect installed
 - Add =#+ANKI_DECK: my-target-deck= to top of the .org file
+  - Also, make sure this deck exists
 - Run =anki-sync-entry= on some heading with content
 
 Note: the card browser must be closed while synchronizing, as it won't
