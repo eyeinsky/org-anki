@@ -22,8 +22,8 @@ Exposes these commands:
 Note: the card browser must be closed while synchronizing, as it won't
 update the note otherwise ([[https://github.com/FooSoft/anki-connect/issues/82][issue]]).
 
-You probably want to bind =anki-sync-entry= to a key sequence, but not
-=anki-delete-entry= -- as accidentally deleting notes will become too
+You probably want to bind =org-anki-sync-entry= to a key sequence, but not
+=org-anki-delete-entry= -- as accidentally deleting notes will become too
 easy.
 
 In any case, don't forget to create backups, as deleting notes will
