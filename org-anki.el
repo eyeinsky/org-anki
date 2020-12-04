@@ -3,10 +3,10 @@
 ;; Copyright (C) 2020 Markus Läll
 ;;
 ;; URL: https://github.com/eyeinsky/org-anki
-;; Version: 0.0.1
+;; Version: 0.0.2
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
-;; Package-Requires: ((emacs "24.3") (request "0.3.2"))
+;; Package-Requires: ((emacs "24.3") (request "0.3.2") (ox-slimhtml "0.4.1"))
 
 ;; This file is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -35,6 +35,7 @@
 (require 'org)
 (require 'request)
 (require 'org-element)
+(require 'ox-slimhtml)
 
 ;; Constants
 
@@ -136,6 +137,14 @@ BODY is the alist json payload, CALLBACK the function to call with result."
     ;; Get entry content
     (buffer-substring-no-properties (point) (re-search-forward "\\([^*].*\n\\)*" nil t))))
 
+(defun org-anki--string-to-html (string)
+  "Convert STRING (org element heading or content) to html."
+  (org-export-string-as string 'slimhtml t nil))
+
+(defun org-anki--report-error (format error)
+  "FORMAT the ERROR and prefix it with `org-anki error'."
+  (let ((fmt0 (concat "org-anki error: " format)))
+    (message fmt0 error)))
 
 ;; Public API, i.e commands what the org-anki user should use:
 
@@ -145,10 +154,10 @@ BODY is the alist json payload, CALLBACK the function to call with result."
 Tries to add, or update if id property exists, the note."
 
   (interactive)
-  (let* ((front    (org-entry-get nil "ITEM"))
+  (let* ((front    (org-anki--string-to-html (org-entry-get nil "ITEM")))
          (maybe-id (org-entry-get nil org-anki-prop-note-id))
          (deck     (org-anki--get-global-prop org-anki-prop-deck))
-         (back     (org-anki--entry-content-until-any-heading)))
+         (back     (org-anki--string-to-html (org-anki--entry-content-until-any-heading))))
 
     (cond
      ;; id property exists, update
@@ -158,7 +167,9 @@ Tries to add, or update if id property exists, the note."
        (lambda (arg)
          (let ((the-error (assoc-default 'error arg)))
            (if the-error
-               (message "Couldn't update note, received error: %s" the-error)
+               (org-anki--report-error
+                "Couldn't update note, received: %s"
+                the-error)
              (message "org-anki says: note succesfully updated!"))))))
      ;; id property doesn't exist, try to create new
      (t
@@ -169,12 +180,15 @@ Tries to add, or update if id property exists, the note."
                (the-result (assoc-default 'result arg)))
            (cond
             (the-error
-             (error "Couldn't add note, received error: %s" the-error))
+             (org-anki--report-error
+              "Couldn't add note, received error: %s"
+              the-error))
             (the-result
              (org-set-property org-anki-prop-note-id (number-to-string the-result))
              (message "org-anki says: note succesfully added!"))
             (t
-             (error "Empty response, it should return new note's id."))))))))))
+             (org-anki--report-error "%s"
+              "Empty response, it should return new note's id."))))))))))
 
 ;;;###autoload
 (defun org-anki-delete-entry ()

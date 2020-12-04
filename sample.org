@@ -1,4 +1,4 @@
-#+ANKI_DECK: org-anki
+#+ANKI_DECK: org-anki-test-deck
 
 The deck name above you need to add, but the ANKI_NOTE_ID's in the
 property drawers are added by this package (given to us in AnkiConnect
@@ -6,21 +6,36 @@ responses as the notes are created).
 
 * Heading 1
 :PROPERTIES:
-:ANKI_NOTE_ID: 1606926919865
+:ANKI_NOTE_ID: 1607119825349
 :END:
 Content 1
 ** Subheading 1
 :PROPERTIES:
-:ANKI_NOTE_ID: 1606926920966
+:ANKI_NOTE_ID: 1607119827823
 :END:
 Subcontent 1
 *** Sub-subcontent 1
 :PROPERTIES:
-:ANKI_NOTE_ID: 1606926922141
+:ANKI_NOTE_ID: 1607113872298
 :END:
 Sub-subcontent 1
-* Heading 2
+* Heading 2, [[https://www.example.com][url]]
 :PROPERTIES:
-:ANKI_NOTE_ID: 1606926923290
+:ANKI_NOTE_ID: 1607113875648
 :END:
-Content 2
+- item
+- item 2 [[https://www.example.com][url]]
+- word :: explanation
+
+todo list
+- [X] todo item, *bold text*
+- [ ] done item, =inline code=
+
+#+BEGIN_QUOTE
+Quote quote quote quote
+#+END_QUOTE
+
+#+BEGIN_SRC haskell
+fibonacci :: [Int]
+fibonacci = 0 : 1 : zipWith (+) fibonacci (tail fibonacci) :: [Int]
+#+END_SRC
