@@ -173,12 +173,12 @@ Tries to add, or update if id property exists, the note."
                (the-result (assoc-default 'result arg)))
            (cond
             (the-error
-             (error "Couldn't add note, received error: %s" the-error))
+             (message "org-anki error: couldn't add note, received error: %s" the-error))
             (the-result
              (org-set-property org-anki-prop-note-id (number-to-string the-result))
              (message "org-anki says: note succesfully added!"))
             (t
-             (error "Empty response, it should return new note's id."))))))))))
+             (message "org-anki error: empty response, it should return new note's id."))))))))))
 
 ;;;###autoload
 (defun org-anki-delete-entry ()
