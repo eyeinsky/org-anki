@@ -6,7 +6,7 @@
 ;; Version: 0.0.2
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
-;; Package-Requires: ((emacs "24.3") (request "0.3.2") (ox-slimhtml "0.4.1"))
+;; Package-Requires: ((emacs "24.4") (request "0.3.2") (ox-slimhtml "0.4.1"))
 
 ;; This file is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
