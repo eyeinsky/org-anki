@@ -3,10 +3,13 @@ Minor mode to synchronize your org-mode entries to Anki.
 
 Works via [[https://foosoft.net/projects/anki-connect/][AnkiConnect]] add-on to [[https://apps.ankiweb.net/][Anki]].[fn:via]
 
-Creates "Basic" type of cards, heading of org entry is set as front,
-text content until next heading is set as the back of the
-card[fn:how]. See [[https://raw.githubusercontent.com/eyeinsky/org-anki/master/sample.org][sample.org]] for how it looks like after all entries are
-synced to Anki.
+** How
+- creates "Basic" type of cards
+- heading of org entry is set as card front
+- text content until next heading is set as card back[fn:how]
+
+See [[/example/example.org][example.org]] and the [[/example/][resulting screenshots]] for how the cards look
+after being synced to Anki.
 
 Both front and back are converted to html.[fn:html-export]
 
