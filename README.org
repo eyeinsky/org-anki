@@ -40,15 +40,8 @@ need to be modified to be ankified.
 The other three are emacs or org-mode only[fn:others], so no spaced repetition
 from your phone or web.
 ** Todo
-- [ ] target deck: read target deck name until found from
-  1. entry property
-  2. global property
-  3. customized variable (i.e in =.emacs=)
-  4. library default
-- [ ] anki-sync-buffer: adds or updates all entries to Anki;
-- [ ] anki-delete-buffer: deletes all entries from Anki which have
-  =ANKI_NOTE_ID= property;
 
+See issues.
 ** Footnotes
 
 [fn:via] AnkiConnect starts a HTTP server on localhost:8765 which the
