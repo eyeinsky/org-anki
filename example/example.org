@@ -1,5 +1,7 @@
 #+ANKI_DECK: org-anki-test-deck
 
+*NB! Browse to the raw version of this file*
+
 The deck name above you need to add, but the ANKI_NOTE_ID's in the
 property drawers are added by this package (given to us in AnkiConnect
 responses as the notes are created).
@@ -14,7 +16,7 @@ Content 1
 :ANKI_NOTE_ID: 1607119827823
 :END:
 Subcontent 1
-*** Sub-subcontent 1
+*** Sub-subheading 1
 :PROPERTIES:
 :ANKI_NOTE_ID: 1607113872298
 :END:
