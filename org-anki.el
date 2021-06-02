@@ -35,12 +35,19 @@
 (require 'org)
 (require 'request)
 (require 'org-element)
+(require 'thunk)
 
 ;; Constants
 
 (defconst org-anki-prop-note-id "ANKI_NOTE_ID")
 (defconst org-anki-prop-deck "ANKI_DECK")
 
+;; Customizable variables
+
+(defcustom org-anki-default-deck nil
+  "Default deck name if none is set on the org item nor as global property"
+  :type '(string)
+  :group 'org-anki)
 
 ;; Stolen code
 
@@ -145,6 +152,16 @@ BODY is the alist json payload, CALLBACK the function to call with result."
   (let ((fmt0 (concat "org-anki error: " format)))
     (message fmt0 error)))
 
+(defun org-anki--find-deck ()
+  (thunk-let
+   ((prop-item (org-entry-get nil org-anki-prop-deck))
+    (prop-global (org-anki--get-global-prop org-anki-prop-deck)))
+    (cond
+     ((stringp prop-item) prop-item)
+     ((stringp prop-global) prop-global)
+     ((stringp org-anki-default-deck) org-anki-default-deck)
+     (t (error "No deck name in item nor file nor set as default deck!")))))
+
 ;; Public API, i.e commands what the org-anki user should use:
 
 ;;;###autoload
@@ -155,7 +172,7 @@ Tries to add, or update if id property exists, the note."
   (interactive)
   (let* ((front    (org-anki--string-to-html (org-entry-get nil "ITEM")))
          (maybe-id (org-entry-get nil org-anki-prop-note-id))
-         (deck     (org-anki--get-global-prop org-anki-prop-deck))
+         (deck     (org-anki--find-deck))
          (back     (org-anki--string-to-html (org-anki--entry-content-until-any-heading))))
 
     (cond
