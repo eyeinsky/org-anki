@@ -41,8 +41,9 @@ lose their scheduling information.
 ** Why
 .. as there are [[https://github.com/louietan/anki-editor][anki-editor]], [[https://github.com/abo-abo/pamparam][pamparam]], [[https://gitlab.com/phillord/org-drill][org-drill]], [[https://github.com/l3kn/org-fc][org-fc]]?
 
-Anki-editor requires subheadings for fields, so existing .org notes
-need to be modified to be ankified.
+Anki-editor requires subheadings for card front and card back, thus existing .org notes
+need to be modified to be ankified. This package takes the heading as
+card front and content as card back.
 
 The other three are emacs or org-mode only[fn:others], so no spaced repetition
 from your phone or web.
