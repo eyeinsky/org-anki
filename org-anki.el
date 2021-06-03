@@ -141,7 +141,10 @@ BODY is the alist json payload, CALLBACK the function to call with result."
     ;; Possibly skip property block until end of entry
     (re-search-forward ":properties:\\(.*\n\\)*:end:" (org-entry-end-position) t)
     ;; Get entry content
-    (buffer-substring-no-properties (point) (re-search-forward "\\([^*].*\n\\)*" nil t))))
+    (let ((from (point))
+          (to (progn (outline-next-visible-heading 1) (point))))
+      (buffer-substring-no-properties from to)
+      )))
 
 (defun org-anki--string-to-html (string)
   "Convert STRING (org element heading or content) to html."
