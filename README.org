@@ -21,9 +21,13 @@ Exposes these commands:
 
 ** Setup
 - Start Anki with AnkiConnect installed
-- Add =#+ANKI_DECK: my-target-deck= to top of the .org file
-  - Also, make sure this deck exists
-- Run =anki-sync-entry= on some heading with content
+- Set destination deck name, either as:
+  - =(customize-set-variable 'org-anki-default-deck "my-target-deck")= in
+    your .emacs
+  - =#+ANKI_DECK: my-target-deck= on top of an .org file
+  - =:ANKI_DECK: my-target-deck= in the properties' drawer of the item
+  - Note that this deck has to be present (created separately in the Anki app)
+- Run =anki-sync-entry= on some org item you want to sync
 
 Note: the card browser must be closed while synchronizing, as it won't
 update the note otherwise ([[https://github.com/FooSoft/anki-connect/issues/82][issue]]).
@@ -37,8 +41,9 @@ lose their scheduling information.
 ** Why
 .. as there are [[https://github.com/louietan/anki-editor][anki-editor]], [[https://github.com/abo-abo/pamparam][pamparam]], [[https://gitlab.com/phillord/org-drill][org-drill]], [[https://github.com/l3kn/org-fc][org-fc]]?
 
-Anki-editor requires subheadings for fields, so existing .org notes
-need to be modified to be ankified.
+Anki-editor requires subheadings for card front and card back, thus existing .org notes
+need to be modified to be ankified. This package takes the heading as
+card front and content as card back.
 
 The other three are emacs or org-mode only[fn:others], so no spaced repetition
 from your phone or web.
