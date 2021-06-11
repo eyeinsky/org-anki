@@ -40,6 +40,7 @@
 ;; Constants
 
 (defconst org-anki-prop-note-id "ANKI_NOTE_ID")
+(defconst org-anki-prop-note-type "ANKI_NOTE_TYPE")
 (defconst org-anki-prop-deck "ANKI_DECK")
 
 ;; Customizable variables
