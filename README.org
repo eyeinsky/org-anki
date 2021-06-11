@@ -61,4 +61,4 @@ probably don't want subheadings in card contents anyway).
 [fn:html-export] Plain org-mode can export to html too but there
 didn't appear to be a plain string-to-basic-html function.
 
-[fn:others] I mean, do you really want to use thes just to use Anki?? :p
+[fn:others] I mean, do you really want to use this just to use Anki?? :p
