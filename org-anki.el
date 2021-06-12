@@ -37,13 +37,21 @@
 (require 'org-element)
 (require 'thunk)
 
-;; Constants
+;;;; Constants
 
 (defconst org-anki-prop-note-id "ANKI_NOTE_ID")
 (defconst org-anki-prop-note-type "ANKI_NOTE_TYPE")
 (defconst org-anki-prop-deck "ANKI_DECK")
 
-;; Customizable variables
+;;;; Variables
+
+(defvar org-anki-check-note-type-hook
+  '(org-anki-check-cloze-type
+    org-anki-check-basic-type)
+  "List of functions to invoke with the front and back content of the
+entry. Must return a type of the note and a field appropriate for the type.")
+
+;;;; Customizable variables
 
 (defcustom org-anki-default-deck nil
   "Default deck name if none is set on the org item nor as global property"
@@ -71,7 +79,7 @@ Default NAME is \"PROPERTY\", default BUFFER the current buffer."
   (plist-get (car (cdr (org-anki--global-props name))) :value))
 
 
-;; Talk to AnkiConnect API:
+;;;; Talk to AnkiConnect API
 
 (defun org-anki-connect-request (body callback)
   "Perform HTTP GET request to AnkiConnect's default http://localhost:8765.
@@ -129,7 +137,7 @@ BODY is the alist json payload, CALLBACK the function to call with result."
   (org-anki--body "deleteNotes" `(("notes" . ,ids))))
 
 
-;; Get card content from org-mode:
+;;;; Get card content from org-mode:
 
 (defun org-anki--entry-content-until-any-heading ()
   "Get entry content until any next heading."
@@ -166,7 +174,49 @@ BODY is the alist json payload, CALLBACK the function to call with result."
      ((stringp org-anki-default-deck) org-anki-default-deck)
      (t (error "No deck name in item nor file nor set as default deck!")))))
 
-;; Public API, i.e commands what the org-anki user should use:
+(defun org-anki--anki-connect-map-note (front back deck &optional type)
+  "Convert FRONT, BACK, DECK to the form that AnkiConnect accepts.
+
+The optional TYPE is used to determine the \"fields\" of the note, it
+usually gets its value invoking `org-anki-check-note-type-hook' but,
+will get overridden by the value of `org-anki-prop-note-type' key in
+the note entry. The
+return value is used by `org-anki--create-note' and
+`org-anki--body'."
+  (let ((note-params))
+    (setq note-params (run-hook-with-args-until-success
+                       'org-anki-check-note-type-hook front back type))
+    `(("note" .
+       (("deckName" . ,deck)
+        ("modelName" . (car note-params))
+        ("fields" . (cdr note-params))
+        ("options" .
+         (("allowDuplicates" . :json-false)
+          ("duplicateScope" . "deck"))))))))
+
+(defun org-anki-check-cloze-type (front back &optional type)
+  "Check if FRONT has an appropriate cloze syntax, if not, return nil.
+
+The optional TYPE is explicitly given by user. when TYPE is \"Cloze\"
+then treat this as one. So when FRONT has cloze syntax or TYPE is
+\"Cloze\" return a cons cell appropriate for
+`org-anki--anki-connect-map-note'."
+  ;; Check for cloze first,
+  (let* ((cloze (string-match "{{c[0-9]+::\\([^:\}]*\\)::\\(?[^:\}]*\\)}}" front))
+         (hint (match-string 2))) ; Hint is the string here ^^^^^^^^^
+    ;; Return values, will return nil, if there is no for any questions.
+    (if (and type                 ; Check if user specified TYPE
+             (string= type "Cloze"))  ; If yes, is it "Cloze"?
+        (when (or cloze               ; If it is, is there any cloze in headline?
+                  (yes-or-no-p        ; No cloze in headline, prompt for confirmation.
+                   (concat "There is no cloze in " front " still wants to sync it? ")))
+          ;; Yes, there is cloze in headline.
+          (cons type `("Text" . ,front)))) ; Return the cons cell, FRONT will be the text.
+    ;; User doesn't specify TYPE
+    (when cloze                       ; Is there any cloze
+      (cons type `("Text" . ,front)))))
+
+;;;; Public API, i.e commands what the org-anki user should use:
 
 ;;;###autoload
 (defun org-anki-sync-entry ()
@@ -177,8 +227,8 @@ Tries to add, or update if id property exists, the note."
   (let* ((front    (org-anki--string-to-html (org-entry-get nil "ITEM")))
          (maybe-id (org-entry-get nil org-anki-prop-note-id))
          (deck     (org-anki--find-deck))
-         (back     (org-anki--string-to-html (org-anki--entry-content-until-any-heading))))
-
+         (back     (org-anki--string-to-html (org-anki--entry-content-until-any-heading)))
+         (type     (org-entry-get nil org-anki-prop-note-type)))
     (cond
      ;; id property exists, update
      (maybe-id
@@ -194,7 +244,7 @@ Tries to add, or update if id property exists, the note."
      ;; id property doesn't exist, try to create new
      (t
       (org-anki-connect-request
-       (org-anki--create-note front back deck)
+       (org-anki--create-note front back deck type)
        (lambda (arg)
          (let ((the-error (assoc-default 'error arg))
                (the-result (assoc-default 'result arg)))
@@ -230,7 +280,7 @@ Will lose scheduling data so be careful"
            (message "org-anki says: note successfully deleted!"))))))))
 
 
-;; Helpers for development, don't use
+;;;; Helpers for development, don't use
 
 (defun org-anki--sync-entry-debug ()
   "Debug command which reloads package before running."
