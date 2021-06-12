@@ -109,19 +109,20 @@ BODY is the alist json payload, CALLBACK the function to call with result."
     ("action" . ,action)
     ("params" . ,params)))
 
-(defun org-anki--create-note (front back deck)
+(defun org-anki--create-note (front back deck type)
   "Create an `addNote' json structure to be added to DECK with card FRONT and BACK strings."
   (org-anki--body
    "addNote"
-   `(("note" .
-      (("deckName" . ,deck)
-       ("modelName" . "Basic")
-       ("fields" .
-        (("Front" . ,front)
-         ("Back" . ,back)))
-       ("options" .
-        (("allowDuplicate" . :json-false)
-         ("duplicateScope" . "deck"))))))))
+   (org-anki--anki-connect-map-note front back deck type)))
+   ;; `(("note" .
+   ;;    (("deckName" . ,deck)
+   ;;     ("modelName" . "Basic")
+   ;;     ("fields" .
+   ;;      (("Front" . ,front)
+   ;;       ("Back" . ,back)))
+   ;;     ("options" .
+   ;;      (("allowDuplicate" . :json-false)
+   ;;       ("duplicateScope" . "deck"))))))))
 
 (defun org-anki--update-note (id new-front new-back)
   "Create an `updateNoteFields' json structure with integer ID, and NEW-FRONT and NEW-BACK strings."
@@ -188,8 +189,8 @@ return value is used by `org-anki--create-note' and
                        'org-anki-check-note-type-hook front back type))
     `(("note" .
        (("deckName" . ,deck)
-        ("modelName" . (car note-params))
-        ("fields" . (cdr note-params))
+        ("modelName" . ,(car note-params))
+        ("fields" . ,(cdr note-params))
         ("options" .
          (("allowDuplicates" . :json-false)
           ("duplicateScope" . "deck"))))))))
@@ -202,8 +203,7 @@ then treat this as one. So when FRONT has cloze syntax or TYPE is
 \"Cloze\" return a cons cell appropriate for
 `org-anki--anki-connect-map-note'."
   ;; Check for cloze first,
-  (let* ((cloze (string-match "{{c[0-9]+::\\([^:\}]*\\)::\\(?[^:\}]*\\)}}" front))
-         (hint (match-string 2))) ; Hint is the string here ^^^^^^^^^
+  (let* ((cloze (string-match "{{c[0-9]+::\\([^:\}]*\\)::\\([^:\}]*\\)}}" front)))
     ;; Return values, will return nil, if there is no for any questions.
     (if (and type                 ; Check if user specified TYPE
              (string= type "Cloze"))  ; If yes, is it "Cloze"?
@@ -214,7 +214,7 @@ then treat this as one. So when FRONT has cloze syntax or TYPE is
           (cons type `("Text" . ,front)))) ; Return the cons cell, FRONT will be the text.
     ;; User doesn't specify TYPE
     (when cloze                       ; Is there any cloze
-      (cons type `("Text" . ,front)))))
+      (cons "Cloze" `("Text" . ,front)))))
 
 ;;;; Public API, i.e commands what the org-anki user should use:
 
