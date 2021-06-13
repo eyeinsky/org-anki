@@ -114,16 +114,7 @@ BODY is the alist json payload, CALLBACK the function to call with result."
   (org-anki--body
    "addNote"
    (org-anki--anki-connect-map-note front back deck type)))
-   ;; `(("note" .
-   ;;    (("deckName" . ,deck)
-   ;;     ("modelName" . "Basic")
-   ;;     ("fields" .
-   ;;      (("Front" . ,front)
-   ;;       ("Back" . ,back)))
-   ;;     ("options" .
-   ;;      (("allowDuplicate" . :json-false)
-   ;;       ("duplicateScope" . "deck"))))))))
-
+   
 (defun org-anki--update-note (id new-front new-back)
   "Create an `updateNoteFields' json structure with integer ID, and NEW-FRONT and NEW-BACK strings."
   (org-anki--body
@@ -195,6 +186,20 @@ return value is used by `org-anki--create-note' and
          (("allowDuplicates" . :json-false)
           ("duplicateScope" . "deck"))))))))
 
+(defun org-anki-check-basic-type (front back &optional type)
+  "Returns a cons cell for  `org-anki--anki-connect-map-note'"
+  (cons "Basic" (list (cons "Front" front)
+                      (cons "Back" back))))
+;; `(("note" .
+;;    (("deckName" . ,deck)
+;;     ("modelName" . "Basic")
+;;     ("fields" .
+;;      (("Front" . ,front)
+;;       ("Back" . ,back)))
+;;     ("options" .
+;;      (("allowDuplicate" . :json-false)
+;;       ("duplicateScope" . "deck"))))))))
+
 (defun org-anki-check-cloze-type (front back &optional type)
   "Check if FRONT has an appropriate cloze syntax, if not, return nil.
 
@@ -211,10 +216,11 @@ then treat this as one. So when FRONT has cloze syntax or TYPE is
                   (yes-or-no-p        ; No cloze in headline, prompt for confirmation.
                    (concat "There is no cloze in " front " still wants to sync it? ")))
           ;; Yes, there is cloze in headline.
-          (cons type `("Text" . ,front)))) ; Return the cons cell, FRONT will be the text.
+          (cons type `(list ("Text" . ,front))))) ; Return the cons cell, FRONT will be the text.
     ;; User doesn't specify TYPE
-    (when cloze                       ; Is there any cloze
-      (cons "Cloze" `("Text" . ,front)))))
+    (when (and cloze
+               (null type))                       ; Is there any cloze
+      (cons "Cloze" (list `("Text" . ,front))))))
 
 ;;;; Public API, i.e commands what the org-anki user should use:
 
