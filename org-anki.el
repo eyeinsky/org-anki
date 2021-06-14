@@ -228,6 +228,39 @@ Will lose scheduling data so be careful"
            (org-delete-property org-anki-prop-note-id)
            (message "org-anki says: note successfully deleted!"))))))))
 
+;;;###autoload
+(defun org-anki-sync-entry-all (&optional file-name)
+  "Call `org-anki-sync-entry' on every headline in FILE-NAME.
+
+If call interactively, call `org-anki-sync-entry' on every headline in
+this file.'"
+  (interactive)
+  (let ((target-file (or file-name buffer-file-name))
+        (file-buf))
+    (cond
+     ((not (file-exists-p target-file)) (org-anki--report-error "File %s doesn't exist!" target-file))
+     ((not (string= (file-name-extension target-file) "org")) (org-anki--report-error "File %s is not an org file!" target-file))
+     (t
+      (setq file-buf (find-file-noselect target-file))
+      (with-current-buffer file-buf
+        (org-map-entries 'org-anki-sync-entry t 'file))))))
+
+;;;###autoload
+(defun org-anki-delete-entry-all (&optional file-name)
+    "Call `org-anki-delete-entry' on every headline in FILE-NAME.
+
+If call interactively, call `org-anki-delete-entry' on every headline in
+this file.'"
+  (interactive)
+  (let ((target-file (or file-name buffer-file-name))
+        (file-buf))
+    (cond
+     ((not (file-exists-p target-file)) (org-anki--report-error "File %s doesn't exist!" target-file))
+     ((not (string= (file-name-extension target-file) "org")) (org-anki--report-error "File %s is not an org file!" target-file))
+     (t
+      (setq file-buf (find-file-noselect target-file))
+      (with-current-buffer file-buf
+        (org-map-entries 'org-anki-delete-entry t 'file))))))
 
 ;; Helpers for development, don't use
 
