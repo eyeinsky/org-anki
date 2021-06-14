@@ -45,11 +45,15 @@
 
 ;;;; Variables
 
-(defvar org-anki-check-note-type-hook
-  '(org-anki-check-cloze-type
-    org-anki-check-basic-type)
-  "List of functions to invoke with the front and back content of the
-entry. Must return a type of the note and a field appropriate for the type.")
+(defvar org-anki-get-note-type-hook '(org-anki--check-cloze
+                                      org-anki--check-basic)
+  "List of functions to call when no note types are specified, take
+the front and the back of a card as argument, must return a note type
+in string, the string in turn, will be used as a key to an alist
+`org-anki-get-fields-note' that get the \"fields\" of the note.
+
+See the documentation of `org-anki-get-fields-note' or `org-anki--check-cloze'
+for example.")
 
 ;;;; Customizable variables
 
@@ -57,6 +61,15 @@ entry. Must return a type of the note and a field appropriate for the type.")
   "Default deck name if none is set on the org item nor as global property"
   :type '(string)
   :group 'org-anki)
+
+
+(defcustom org-anki-get-fields-note '(("Cloze" . org-anki--get-fields-Cloze-type)
+                                      ("Basic" . org-anki--get-fields-Basic-type))
+  "An alist of functions to call that return the \"fields\" of the
+note based on the front and the back of a card 
+(the heading and the content of an org element essentially)."
+  :type '(alist :key-type (regexp :tag "Note type")
+                :value-type (function :tag "Get fields functions")))
 
 ;; Stolen code
 
@@ -109,20 +122,22 @@ BODY is the alist json payload, CALLBACK the function to call with result."
     ("action" . ,action)
     ("params" . ,params)))
 
-(defun org-anki--create-note (front back deck type)
+(defun org-anki--create-note (id front back deck type)
   "Create an `addNote' json structure to be added to DECK with card FRONT and BACK strings."
   (org-anki--body
    "addNote"
-   (org-anki--anki-connect-map-note front back deck type)))
+   `(("note" .
+      ,(org-anki--anki-connect-map-note id front back deck type)))))
    
 (defun org-anki--update-note (id new-front new-back)
   "Create an `updateNoteFields' json structure with integer ID, and NEW-FRONT and NEW-BACK strings."
   (org-anki--body
    "updateNoteFields"
-   `(("note" .
-      (("id" . ,id)
-       ("deckName" . "org-mode")
-       ("fields" . (("Front" . ,new-front) ("Back" . ,new-back))))))))
+   (list (cons "note" (org-anki--anki-connect-map-note id new-front new-back)))))
+   ;; `(("note" .
+   ;;    (("id" . ,id)
+   ;;     ("deckName" . "org-mode")
+   ;;     ("fields" . (("Front" . ,new-front) ("Back" . ,new-back))))))))
 
 (defun org-anki--delete-notes (ids)
   "Create an `deleteNotes' json structure with integer IDS list."
@@ -166,31 +181,33 @@ BODY is the alist json payload, CALLBACK the function to call with result."
      ((stringp org-anki-default-deck) org-anki-default-deck)
      (t (error "No deck name in item nor file nor set as default deck!")))))
 
-(defun org-anki--anki-connect-map-note (front back deck &optional type)
-  "Convert FRONT, BACK, DECK to the form that AnkiConnect accepts.
+(defun org-anki--anki-connect-map-note (id front back &optional deck type)
+  "Return the \"fields\" an anki note from FRONT and BACK.
 
-The optional TYPE is used to determine the \"fields\" of the note, it
-usually gets its value invoking `org-anki-check-note-type-hook' but,
-will get overridden by the value of `org-anki-prop-note-type' key in
-the note entry. The
-return value is used by `org-anki--create-note' and
-`org-anki--body'."
-  (let ((note-params))
-    (setq note-params (run-hook-with-args-until-success
-                       'org-anki-check-note-type-hook front back type))
-    `(("note" .
-       (("deckName" . ,deck)
-        ("modelName" . ,(car note-params))
-        ("fields" . ,(cdr note-params))
-        ("options" .
-         (("allowDuplicates" . :json-false)
-          ("duplicateScope" . "deck"))))))))
+When ID is non-nil, return only the \"fields\" and \"id\".
+The optional TYPE if non-nil, is used to determine which function in
+`org-anki-check-note-type-hook' to call to get the \"fields\" of
+the note, user can specify TYPE by the value of
+`org-anki-prop-note-type' key in the note entry.
 
-(defun org-anki-check-basic-type (front back &optional type)
-  "Returns a cons cell for  `org-anki--anki-connect-map-note'"
-  (cons "Basic" (list (cons "Front" front)
-                      (cons "Back" back))))
-;; `(("note" .
+The return value is used by `org-anki--create-note' and `org-anki--body'."
+  (let* ((note-type (or type (run-hook-with-args-until-success
+                              'org-anki-get-note-type-hook front back)))
+         (note-fn (alist-get note-type org-anki-get-fields-note
+                             nil nil 'string=))
+         (fields-params (funcall note-fn front back)))
+    (if (not note-fn)
+        (org-anki--report-error "%s not supported." note-type)
+      (if id
+          `(("id" . ,(string-to-number id))
+            ("fields" . ,fields-params))
+        `(("deckName" .  ,deck)
+          ("modelName" . ,note-type)
+          ("fields" . ,fields-params)
+          ("options" .
+           (("allowDuplicates" . :json-false)
+            ("duplicateScope" . "deck"))))))))
+
 ;;    (("deckName" . ,deck)
 ;;     ("modelName" . "Basic")
 ;;     ("fields" .
@@ -200,27 +217,31 @@ return value is used by `org-anki--create-note' and
 ;;      (("allowDuplicate" . :json-false)
 ;;       ("duplicateScope" . "deck"))))))))
 
-(defun org-anki-check-cloze-type (front back &optional type)
-  "Check if FRONT has an appropriate cloze syntax, if not, return nil.
+(defun org-anki--check-cloze (front back)
+  "Check if FRONT has an appropriate cloze syntax, if not, return nil."
+  ;; Check for something similar to {{c1::Hidden-text::Hint}} in FRONT
+  (if (string-match "{{c[0-9]+::\\([^:\}]*\\)::\\([^:\}]*\\)}}" front)
+      "Cloze"                           ; Yes, Return "Cloze"
+    ;; No, send a message then return nil.
+    (org-anki--report-error "No cloze in %s, it's a Basic note."
+                            ;; Remove newline from htmlized FRONT
+                            (replace-regexp-in-string "\n" "" front))
+    nil))
 
-The optional TYPE is explicitly given by user. when TYPE is \"Cloze\"
-then treat this as one. So when FRONT has cloze syntax or TYPE is
-\"Cloze\" return a cons cell appropriate for
-`org-anki--anki-connect-map-note'."
-  ;; Check for cloze first,
-  (let* ((cloze (string-match "{{c[0-9]+::\\([^:\}]*\\)::\\([^:\}]*\\)}}" front)))
-    ;; Return values, will return nil, if there is no for any questions.
-    (if (and type                 ; Check if user specified TYPE
-             (string= type "Cloze"))  ; If yes, is it "Cloze"?
-        (when (or cloze               ; If it is, is there any cloze in headline?
-                  (yes-or-no-p        ; No cloze in headline, prompt for confirmation.
-                   (concat "There is no cloze in " front " still wants to sync it? ")))
-          ;; Yes, there is cloze in headline.
-          (cons type `(list ("Text" . ,front))))) ; Return the cons cell, FRONT will be the text.
-    ;; User doesn't specify TYPE
-    (when (and cloze
-               (null type))                       ; Is there any cloze
-      (cons "Cloze" (list `("Text" . ,front))))))
+(defun org-anki--check-basic (front back)
+  "Always return \"Basic\" for `org-anki-get-fields-note', this is
+used as a fallback when other functions in
+`org-anki-get-note-type-hook' fails, as in, return nil."
+"Basic")
+
+(defun org-anki--get-fields-Cloze-type (front back)
+  "Ignore BACK, return FRONT as \"Text\" params for fields."
+  (list (cons "Text" front)))
+
+(defun org-anki--get-fields-Basic-type (front back)
+  "Return FRONT as \"Front\" and BACK as \"Back\" params for fields."
+  (list (cons "Front" front)
+        (cons "Back" back)))
 
 ;;;; Public API, i.e commands what the org-anki user should use:
 
@@ -250,7 +271,7 @@ Tries to add, or update if id property exists, the note."
      ;; id property doesn't exist, try to create new
      (t
       (org-anki-connect-request
-       (org-anki--create-note front back deck type)
+       (org-anki--create-note maybe-id front back deck type)
        (lambda (arg)
          (let ((the-error (assoc-default 'error arg))
                (the-result (assoc-default 'result arg)))
