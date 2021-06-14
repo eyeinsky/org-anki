@@ -182,7 +182,7 @@ BODY is the alist json payload, CALLBACK the function to call with result."
      (t (error "No deck name in item nor file nor set as default deck!")))))
 
 (defun org-anki--anki-connect-map-note (id front back &optional deck type)
-  "Return the \"fields\" an anki note from FRONT and BACK.
+  "Return the parameters appropriate for an anki note from FRONT and BACK.
 
 When ID is non-nil, return only the \"fields\" and \"id\".
 The optional TYPE if non-nil, is used to determine which function in
