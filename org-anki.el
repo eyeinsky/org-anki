@@ -245,6 +245,36 @@ used as a fallback when other functions in
 
 ;;;; Public API, i.e commands what the org-anki user should use:
 
+;; Stolen from the package anki-editor
+;; Check it out,
+;; https://github.com/louietan/anki-editor
+
+(defun org-anki-cloze (begin end arg hint)
+  "Cloze region from BEGIN to END with number ARG."
+  (let ((region (buffer-substring begin end)))
+    (save-excursion
+      (delete-region begin end)
+      (insert (with-output-to-string
+                (princ (format "{{c%d::%s" (or arg 1) region))
+                (unless (string-blank-p hint) (princ (format "::%s" hint)))
+                (princ "}}"))))))
+
+(defun org-anki-cloze-region (&optional arg hint)
+  "Cloze region with number ARG."
+  (interactive "p\nsHint (optional): ")
+  (unless (region-active-p) (error "No active region"))
+  (org-anki-cloze (region-beginning) (region-end) arg hint))
+
+(defun org-anki-cloze-dwim (&optional arg hint)
+  "Cloze current active region or a word the under the cursor"
+  (interactive "p\nsHint (optional): ")
+  (cond
+   ((region-active-p) (org-anki-cloze (region-beginning) (region-end) arg hint))
+   ((thing-at-point 'word) (let ((bounds (bounds-of-thing-at-point 'word)))
+                             (org-anki-cloze (car bounds) (cdr bounds) arg hint)))
+   (t (error "Nothing to create cloze from"))))
+
+
 ;;;###autoload
 (defun org-anki-sync-entry ()
   "Synchronize single entry.
