@@ -106,10 +106,7 @@ BODY is the alist json payload, CALLBACK the function to call with result."
    "addNote"
    `(("note" .
       (("deckName" . ,deck)
-       ("modelName" . "Basic")
-       ("fields" .
-        (("Front" . ,front)
-         ("Back" . ,back)))
+       ,@(org-anki--to-fields front back)
        ("options" .
         (("allowDuplicate" . :json-false)
          ("duplicateScope" . "deck"))))))))
@@ -120,7 +117,7 @@ BODY is the alist json payload, CALLBACK the function to call with result."
    "updateNoteFields"
    `(("note" .
       (("id" . ,id)
-       ("fields" . (("Front" . ,new-front) ("Back" . ,new-back))))))))
+       ,@(org-anki--to-fields new-front new-back))))))
 
 (defun org-anki--delete-notes (ids)
   "Create an `deleteNotes' json structure with integer IDS list."
@@ -163,6 +160,25 @@ BODY is the alist json payload, CALLBACK the function to call with result."
      ((stringp prop-global) prop-global)
      ((stringp org-anki-default-deck) org-anki-default-deck)
      (t (error "No deck name in item nor file nor set as default deck!")))))
+
+;; Cloze
+
+(defun org-anki--is-cloze (text)
+  "Check if TEXT has cloze syntax, return nil if not."
+  ;; Check for something similar to {{c1::Hidden-text::Hint}} in TEXT
+  (if (string-match "{{c[0-9]+::\\([^:\}]*\\)::\\([^:\}]*\\)}}" text)
+      "Cloze"
+    nil))
+
+(defun org-anki--to-fields (front back)
+  "Convert org item title FRONT and content BACK to json fields sent to AnkiConnect. If FRONT contains Cloze syntax then both the question and answer are generated from it, and BACK is ignored."
+  (cond
+   ((org-anki--is-cloze front)
+    `(("modelName" . "Cloze")
+      ("fields" . (("Text" . ,front)))))
+   (t
+    `(("modelName" . "Basic")
+      ("fields" . (("Front" . ,front) ("Back" . ,back)))))))
 
 ;; Public API, i.e commands what the org-anki user should use:
 
