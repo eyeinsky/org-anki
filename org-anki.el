@@ -120,7 +120,6 @@ BODY is the alist json payload, CALLBACK the function to call with result."
    "updateNoteFields"
    `(("note" .
       (("id" . ,id)
-       ("deckName" . "org-mode")
        ("fields" . (("Front" . ,new-front) ("Back" . ,new-back))))))))
 
 (defun org-anki--delete-notes (ids)
