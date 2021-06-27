@@ -176,6 +176,9 @@ BODY is the alist json payload, CALLBACK the function to call with result."
    ((org-anki--is-cloze front)
     `(("modelName" . "Cloze")
       ("fields" . (("Text" . ,front)))))
+   ((org-anki--is-cloze back)
+    `(("modelName" . "Cloze")
+      ("fields" . (("Text" . ,back)))))
    (t
     `(("modelName" . "Basic")
       ("fields" . (("Front" . ,front) ("Back" . ,back)))))))
