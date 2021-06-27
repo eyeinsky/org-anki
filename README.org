@@ -4,20 +4,24 @@ Minor mode to synchronize your org-mode entries to Anki.
 Works via [[https://foosoft.net/projects/anki-connect/][AnkiConnect]] add-on to [[https://apps.ankiweb.net/][Anki]].[fn:via]
 
 ** How
-- creates "Basic" type of cards
-- heading of org entry is set as card front
-- text content until next heading is set as card back[fn:how]
+Creates "Basic" or "Cloze" type notes.
+
+By default "Basic" cards are created where org entry's heading is the
+card front and content is the back.[fn:how] If the heading has Cloze
+syntax (={{...}}=) then the heading is used to create both the
+question and the answer, and content of the org entry is not used.
 
 See [[/example/example.org][example.org]] and the [[/example/][resulting screenshots]] for how the cards look
 after being synced to Anki.
 
-Both front and back are converted to html.[fn:html-export]
-
-Exposes these commands:
+** Commands
 - =org-anki-sync-entry= :: adds or updates the current org-entry under
      cursor
 - =org-anki-delete-entry= :: deletes entry from Anki. Entry must have
      =ANKI_NOTE_ID= property
+- =org-anki-cloze-dwim= :: converts a region or word under cursor to
+  Cloze syntax, i.e ={{c1::hidden text::hint text}}=. This should be
+  used in org entry's title.
 
 ** Setup
 - Start Anki with AnkiConnect installed
@@ -26,8 +30,10 @@ Exposes these commands:
     your .emacs
   - =#+ANKI_DECK: my-target-deck= on top of an .org file
   - =:ANKI_DECK: my-target-deck= in the properties' drawer of the item
-  - Note that this deck has to be present (created separately in the Anki app)
-- Run =anki-sync-entry= on some org item you want to sync
+  - Note that deck mentioned in the above ways must pre-exist (it has
+    to be separately created in the Anki app)
+- Run =anki-sync-entry= to sync org entry under cursor
+- Run =org-anki-delete-entry= to delete entry under cursor
 
 Note: the card browser must be closed while synchronizing, as it won't
 update the note otherwise ([[https://github.com/FooSoft/anki-connect/issues/82][issue]]).
@@ -47,9 +53,6 @@ card front and content as card back.
 
 The other three are emacs or org-mode only[fn:others], so no spaced repetition
 from your phone or web.
-** Todo
-
-See issues.
 ** Footnotes
 
 [fn:via] AnkiConnect starts a HTTP server on localhost:8765 which the
@@ -57,8 +60,5 @@ current package talks to.
 
 [fn:how] It does this even if the next heading is a sub-heading (you
 probably don't want subheadings in card contents anyway).
-
-[fn:html-export] Plain org-mode can export to html too but there
-didn't appear to be a plain string-to-basic-html function.
 
 [fn:others] I mean, do you really want to use this just to use Anki?? :p
