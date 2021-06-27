@@ -180,6 +180,17 @@ BODY is the alist json payload, CALLBACK the function to call with result."
     `(("modelName" . "Basic")
       ("fields" . (("Front" . ,front) ("Back" . ,back)))))))
 
+;; Stolen from https://github.com/louietan/anki-editor
+(defun org-anki--region-to-cloze (begin end arg hint)
+  "Cloze region from BEGIN to END with number ARG."
+  (let ((region (buffer-substring begin end)))
+    (save-excursion
+      (delete-region begin end)
+      (insert (with-output-to-string
+                (princ (format "{{c%d::%s" (or arg 1) region))
+                (unless (string-blank-p hint) (princ (format "::%s" hint)))
+                (princ "}}"))))))
+
 ;; Public API, i.e commands what the org-anki user should use:
 
 ;;;###autoload
@@ -243,6 +254,18 @@ Will lose scheduling data so be careful"
            (org-delete-property org-anki-prop-note-id)
            (message "org-anki says: note successfully deleted!"))))))))
 
+;; Stolen from https://github.com/louietan/anki-editor
+;;;###autoload
+(defun org-anki-cloze-dwim (&optional arg hint)
+  "Convert current active region or word under cursor to Cloze syntax."
+  (interactive "p\nsHint (optional): ")
+  (cond
+   ((region-active-p)
+    (org-anki--region-to-cloze (region-beginning) (region-end) arg hint))
+   ((thing-at-point 'word)
+    (let ((bounds (bounds-of-thing-at-point 'word)))
+      (org-anki-cloze (car bounds) (cdr bounds) arg hint)))
+   (t (error "Nothing to create cloze from"))))
 
 ;; Helpers for development, don't use
 
