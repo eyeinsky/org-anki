@@ -41,3 +41,19 @@ Quote quote quote quote
 fibonacci :: [Int]
 fibonacci = 0 : 1 : zipWith (+) fibonacci (tail fibonacci) :: [Int]
 #+END_SRC
+* Kaleida company history
+Here’s their what they output
+The three questions here are all cloze deletion exercise
+taken from https://www.supermemo.com/en/archives1990-2015/articles/20rules
+** Q: Kaleida was funded to the tune of {{c1::$40 million::…amount}} by Apple Computer and IBM in 1991
+:PROPERTIES:
+:ANKI_NOTE_ID: 1623645114532
+:END:
+** Q: Kaleida was funded to the tune of $40 million by {{c1::Apple and IBM::…company}} in 1991
+:PROPERTIES:
+:ANKI_NOTE_ID: 1623645117281
+:END:
+** Q: Kaleida was funded to the tune of $40 million by Apple Computer and IBM in {{c1::1991::…year}}
+:PROPERTIES:
+:ANKI_NOTE_ID: 1623645118855
+:END:
