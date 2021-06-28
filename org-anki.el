@@ -1,9 +1,9 @@
 ;;; org-anki.el --- Synchronize org-mode entries to Anki -*- lexical-binding: t -*-
 ;;
-;; Copyright (C) 2020 Markus Läll
+;; Copyright (C) 2021 Markus Läll
 ;;
 ;; URL: https://github.com/eyeinsky/org-anki
-;; Version: 0.0.1
+;; Version: 0.0.3
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
 ;; Package-Requires: ((emacs "24.4") (request "0.3.2"))
@@ -106,10 +106,7 @@ BODY is the alist json payload, CALLBACK the function to call with result."
    "addNote"
    `(("note" .
       (("deckName" . ,deck)
-       ("modelName" . "Basic")
-       ("fields" .
-        (("Front" . ,front)
-         ("Back" . ,back)))
+       ,@(org-anki--to-fields front back)
        ("options" .
         (("allowDuplicate" . :json-false)
          ("duplicateScope" . "deck"))))))))
@@ -120,8 +117,7 @@ BODY is the alist json payload, CALLBACK the function to call with result."
    "updateNoteFields"
    `(("note" .
       (("id" . ,id)
-       ("deckName" . "org-mode")
-       ("fields" . (("Front" . ,new-front) ("Back" . ,new-back))))))))
+       ,@(org-anki--to-fields new-front new-back))))))
 
 (defun org-anki--delete-notes (ids)
   "Create an `deleteNotes' json structure with integer IDS list."
@@ -164,6 +160,39 @@ BODY is the alist json payload, CALLBACK the function to call with result."
      ((stringp prop-global) prop-global)
      ((stringp org-anki-default-deck) org-anki-default-deck)
      (t (error "No deck name in item nor file nor set as default deck!")))))
+
+;; Cloze
+
+(defun org-anki--is-cloze (text)
+  "Check if TEXT has cloze syntax, return nil if not."
+  ;; Check for something similar to {{c1::Hidden-text::Hint}} in TEXT
+  (if (string-match "{{c[0-9]+::\\([^:\}]*\\)::\\([^:\}]*\\)}}" text)
+      "Cloze"
+    nil))
+
+(defun org-anki--to-fields (front back)
+  "Convert org item title FRONT and content BACK to json fields sent to AnkiConnect. If FRONT contains Cloze syntax then both the question and answer are generated from it, and BACK is ignored."
+  (cond
+   ((org-anki--is-cloze front)
+    `(("modelName" . "Cloze")
+      ("fields" . (("Text" . ,front)))))
+   ((org-anki--is-cloze back)
+    `(("modelName" . "Cloze")
+      ("fields" . (("Text" . ,back)))))
+   (t
+    `(("modelName" . "Basic")
+      ("fields" . (("Front" . ,front) ("Back" . ,back)))))))
+
+;; Stolen from https://github.com/louietan/anki-editor
+(defun org-anki--region-to-cloze (begin end arg hint)
+  "Cloze region from BEGIN to END with number ARG."
+  (let ((region (buffer-substring begin end)))
+    (save-excursion
+      (delete-region begin end)
+      (insert (with-output-to-string
+                (princ (format "{{c%d::%s" (or arg 1) region))
+                (unless (string-blank-p hint) (princ (format "::%s" hint)))
+                (princ "}}"))))))
 
 ;; Public API, i.e commands what the org-anki user should use:
 
@@ -228,27 +257,18 @@ Will lose scheduling data so be careful"
            (org-delete-property org-anki-prop-note-id)
            (message "org-anki says: note successfully deleted!"))))))))
 
-
-;; Helpers for development, don't use
-
-(defun org-anki--sync-entry-debug ()
-  "Debug command which reloads package before running."
-  (interactive)
-  (message "org-anki-sync-entry-debug")
-  (eval-buffer "org-anki.el")
-  (org-anki-sync-entry))
-
-(defun org-anki--delete-entry-debug ()
-  "Debug command which reloads package before running."
-  (interactive)
-  (message "org-anki-delete-entry-debug")
-  (eval-buffer "org-anki.el")
-  (org-anki-delete-entry))
-
-(defun org-anki--debug-bind ()
-  "Define keys for testing."
-  (define-key org-mode-map (kbd "C-c C-c") 'org-anki--sync-entry-debug)
-  (define-key org-mode-map (kbd "C-d C-d") 'org-anki--delete-entry-debug))
+;; Stolen from https://github.com/louietan/anki-editor
+;;;###autoload
+(defun org-anki-cloze-dwim (&optional arg hint)
+  "Convert current active region or word under cursor to Cloze syntax."
+  (interactive "p\nsHint (optional): ")
+  (cond
+   ((region-active-p)
+    (org-anki--region-to-cloze (region-beginning) (region-end) arg hint))
+   ((thing-at-point 'word)
+    (let ((bounds (bounds-of-thing-at-point 'word)))
+      (org-anki-cloze (car bounds) (cdr bounds) arg hint)))
+   (t (error "Nothing to create cloze from"))))
 
 (provide 'org-anki)
 ;;; org-anki.el ends here
