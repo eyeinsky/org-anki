@@ -270,26 +270,5 @@ Will lose scheduling data so be careful"
       (org-anki-cloze (car bounds) (cdr bounds) arg hint)))
    (t (error "Nothing to create cloze from"))))
 
-;; Helpers for development, don't use
-
-(defun org-anki--sync-entry-debug ()
-  "Debug command which reloads package before running."
-  (interactive)
-  (message "org-anki-sync-entry-debug")
-  (eval-buffer "org-anki.el")
-  (org-anki-sync-entry))
-
-(defun org-anki--delete-entry-debug ()
-  "Debug command which reloads package before running."
-  (interactive)
-  (message "org-anki-delete-entry-debug")
-  (eval-buffer "org-anki.el")
-  (org-anki-delete-entry))
-
-(defun org-anki--debug-bind ()
-  "Define keys for testing."
-  (define-key org-mode-map (kbd "C-c C-c") 'org-anki--sync-entry-debug)
-  (define-key org-mode-map (kbd "C-d C-d") 'org-anki--delete-entry-debug))
-
 (provide 'org-anki)
 ;;; org-anki.el ends here
