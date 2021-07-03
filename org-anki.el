@@ -6,7 +6,7 @@
 ;; Version: 0.0.3
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
-;; Package-Requires: ((emacs "24.4") (request "0.3.2"))
+;; Package-Requires: ((emacs "24.4") (request "0.3.2") (org "9.4))
 
 ;; This file is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -49,25 +49,9 @@
   :type '(string)
   :group 'org-anki)
 
-;; Stolen code
-
-;; Get list of global properties
-;;
-;; From:
-;;   https://emacs.stackexchange.com/questions/21713/how-to-get-property-values-from-org-file-headers
-(defun org-anki--global-props (&optional name buffer)
-  "Get the plists of global org properties by NAME in BUFFER.
-
-Default NAME is \"PROPERTY\", default BUFFER the current buffer."
-  (unless name (setq name "PROPERTY"))
-  (with-current-buffer (or buffer (current-buffer))
-    (org-element-map (org-element-parse-buffer) 'keyword
-      (lambda (el) (when (string-match name (org-element-property :key el)) el))
-      nil t)))
-
 (defun org-anki--get-global-prop (name)
   "Get global property by NAME."
-  (plist-get (car (cdr (org-anki--global-props name))) :value))
+  (car (last (car (org-collect-keywords (list name))))))
 
 
 ;; Talk to AnkiConnect API:
