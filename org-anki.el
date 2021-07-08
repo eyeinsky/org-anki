@@ -100,13 +100,14 @@ BODY is the alist json payload, CALLBACK the function to call with result."
     ("action" . ,action)
     ("params" . ,params)))
 
-(defun org-anki--create-note (front back deck)
+(defun org-anki--create-note (front back deck tags)
   "Create an `addNote' json structure to be added to DECK with card FRONT and BACK strings."
   (org-anki--body
    "addNote"
    `(("note" .
       (("deckName" . ,deck)
        ,@(org-anki--to-fields front back)
+       ,tags
        ("options" .
         (("allowDuplicate" . :json-false)
          ("duplicateScope" . "deck"))))))))
@@ -161,6 +162,12 @@ BODY is the alist json payload, CALLBACK the function to call with result."
      ((stringp org-anki-default-deck) org-anki-default-deck)
      (t (error "No deck name in item nor file nor set as default deck!")))))
 
+(defun org-anki--get-tags ()
+  (let ((tags (org-entry-get nil "TAGS")))
+    (cond
+     (tags `("tags" ,(split-string tags ":" t)))
+     (t '("tags" . nil)))))
+
 ;; Cloze
 
 (defun org-anki--is-cloze (text)
@@ -203,6 +210,7 @@ Tries to add, or update if id property exists, the note."
 
   (interactive)
   (let* ((front    (org-anki--string-to-html (org-entry-get nil "ITEM")))
+         (tags     (org-anki--get-tags))
          (maybe-id (org-entry-get nil org-anki-prop-note-id))
          (deck     (org-anki--find-deck))
          (back     (org-anki--string-to-html (org-anki--entry-content-until-any-heading))))
@@ -222,7 +230,7 @@ Tries to add, or update if id property exists, the note."
      ;; id property doesn't exist, try to create new
      (t
       (org-anki-connect-request
-       (org-anki--create-note front back deck)
+       (org-anki--create-note front back deck tags)
        (lambda (arg)
          (let ((the-error (assoc-default 'error arg))
                (the-result (assoc-default 'result arg)))
