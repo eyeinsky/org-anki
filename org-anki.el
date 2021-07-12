@@ -45,7 +45,8 @@
 ;; Customizable variables
 
 (defcustom org-anki-default-deck nil
-  "Default deck name if none is set on the org item nor as global property"
+  "Default deck name if none is set on the org item nor as global
+property"
   :type '(string)
   :group 'org-anki)
 
@@ -70,12 +71,13 @@ Default NAME is \"PROPERTY\", default BUFFER the current buffer."
   (plist-get (car (cdr (org-anki--global-props name))) :value))
 
 
-;; Talk to AnkiConnect API:
+;; AnkiConnect API
 
 (defun org-anki-connect-request (body callback)
   "Perform HTTP GET request to AnkiConnect's default http://localhost:8765.
 
-BODY is the alist json payload, CALLBACK the function to call with result."
+BODY is the alist json payload, CALLBACK the function to call
+with result."
   (request
     "http://localhost:8765" ; This is where AnkiConnect add-on listens.
     :type "GET"
@@ -94,6 +96,8 @@ BODY is the alist json payload, CALLBACK the function to call with result."
      (lambda (&key data &allow-other-keys)
        (funcall callback data)))))
 
+;;; JSON payloads
+
 (defun org-anki--body (action params)
   "Wrap ACTION and PARAMS to a json payload AnkiConnect expects."
   `(("version" . 6)
@@ -101,7 +105,8 @@ BODY is the alist json payload, CALLBACK the function to call with result."
     ("params" . ,params)))
 
 (defun org-anki--create-note (front back deck tags)
-  "Create an `addNote' json structure to be added to DECK with card FRONT and BACK strings."
+  "Create an `addNote' json structure to be added to DECK with
+card FRONT and BACK strings."
   (org-anki--body
    "addNote"
    `(("note" .
@@ -113,19 +118,34 @@ BODY is the alist json payload, CALLBACK the function to call with result."
          ("duplicateScope" . "deck"))))))))
 
 (defun org-anki--update-note (id new-front new-back)
-  "Create an `updateNoteFields' json structure with integer ID, and NEW-FRONT and NEW-BACK strings."
+  "Create an `updateNoteFields' json structure with integer ID,
+and NEW-FRONT and NEW-BACK strings."
   (org-anki--body
    "updateNoteFields"
    `(("note" .
       (("id" . ,id)
        ,@(org-anki--to-fields new-front new-back))))))
 
+(defun org-anki--to-fields (front back)
+  "Convert org item title FRONT and content BACK to json fields
+sent to AnkiConnect. If FRONT contains Cloze syntax then both the
+question and answer are generated from it, and BACK is ignored."
+  (cond
+   ((org-anki--is-cloze front)
+    `(("modelName" . "Cloze")
+      ("fields" . (("Text" . ,front)))))
+   ((org-anki--is-cloze back)
+    `(("modelName" . "Cloze")
+      ("fields" . (("Text" . ,back)))))
+   (t
+    `(("modelName" . "Basic")
+      ("fields" . (("Front" . ,front) ("Back" . ,back)))))))
+
 (defun org-anki--delete-notes (ids)
   "Create an `deleteNotes' json structure with integer IDS list."
   (org-anki--body "deleteNotes" `(("notes" . ,ids))))
 
-
-;; Get card content from org-mode:
+;; org-mode
 
 (defun org-anki--entry-content-until-any-heading ()
   "Get entry content until any next heading."
@@ -168,7 +188,7 @@ BODY is the alist json payload, CALLBACK the function to call with result."
      (tags `("tags" ,(split-string tags ":" t)))
      (t '("tags" . nil)))))
 
-;; Cloze
+;;; Cloze
 
 (defun org-anki--is-cloze (text)
   "Check if TEXT has cloze syntax, return nil if not."
@@ -176,19 +196,6 @@ BODY is the alist json payload, CALLBACK the function to call with result."
   (if (string-match "{{c[0-9]+::\\([^:\}]*\\)::\\([^:\}]*\\)}}" text)
       "Cloze"
     nil))
-
-(defun org-anki--to-fields (front back)
-  "Convert org item title FRONT and content BACK to json fields sent to AnkiConnect. If FRONT contains Cloze syntax then both the question and answer are generated from it, and BACK is ignored."
-  (cond
-   ((org-anki--is-cloze front)
-    `(("modelName" . "Cloze")
-      ("fields" . (("Text" . ,front)))))
-   ((org-anki--is-cloze back)
-    `(("modelName" . "Cloze")
-      ("fields" . (("Text" . ,back)))))
-   (t
-    `(("modelName" . "Basic")
-      ("fields" . (("Front" . ,front) ("Back" . ,back)))))))
 
 ;; Stolen from https://github.com/louietan/anki-editor
 (defun org-anki--region-to-cloze (begin end arg hint)
@@ -201,11 +208,12 @@ BODY is the alist json payload, CALLBACK the function to call with result."
                 (unless (string-blank-p hint) (princ (format "::%s" hint)))
                 (princ "}}"))))))
 
-;; Public API, i.e commands what the org-anki user should use:
+;; Interactive commands
 
 ;;;###autoload
 (defun org-anki-sync-entry ()
   "Synchronize single entry.
+
 Tries to add, or update if id property exists, the note."
 
   (interactive)
@@ -268,7 +276,8 @@ Will lose scheduling data so be careful"
 ;; Stolen from https://github.com/louietan/anki-editor
 ;;;###autoload
 (defun org-anki-cloze-dwim (&optional arg hint)
-  "Convert current active region or word under cursor to Cloze syntax."
+  "Convert current active region or word under cursor to Cloze
+syntax."
   (interactive "p\nsHint (optional): ")
   (cond
    ((region-active-p)
