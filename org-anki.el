@@ -128,7 +128,7 @@ card FRONT and BACK strings."
    `(("note" .
       (("deckName" . ,deck)
        ,@(org-anki--to-fields front back)
-       ,tags
+       ("tags" . ,(if tags tags ""))
        ("options" .
         (("allowDuplicate" . :json-false)
          ("duplicateScope" . "deck"))))))))
@@ -280,7 +280,7 @@ Tries to add, or update if id property exists, the note."
      ;; id property doesn't exist, try to create new
      (t
       (org-anki-connect-request
-       (org-anki--create-note front back deck `("tags" . ,tags))
+       (org-anki--create-note front back deck tags)
        (lambda (arg)
          (let ((the-error (assoc-default 'error arg))
                (the-result (assoc-default 'result arg)))
