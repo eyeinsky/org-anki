@@ -110,7 +110,6 @@ with result."
               )
           (if the-error (reject the-error)
             (let ((tags-v (assoc-default 'tags (aref the-result 0))))
-              (message "anki-connect returns %s" tags-v)
               (funcall resolve (append tags-v nil))))))))))
 
 ;;; JSON payloads
