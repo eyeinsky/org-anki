@@ -185,8 +185,8 @@ question and answer are generated from it, and BACK is ignored."
 (defun org-anki--get-tags ()
   (let ((tags (org-entry-get nil "TAGS")))
     (cond
-     (tags `("tags" ,(split-string tags ":" t)))
-     (t '("tags" . nil)))))
+     (tags (split-string tags ":" t))
+     (t nil))))
 
 ;;; Cloze
 
@@ -238,7 +238,7 @@ Tries to add, or update if id property exists, the note."
      ;; id property doesn't exist, try to create new
      (t
       (org-anki-connect-request
-       (org-anki--create-note front back deck tags)
+       (org-anki--create-note front back deck `("tags" . ,tags))
        (lambda (arg)
          (let ((the-error (assoc-default 'error arg))
                (the-result (assoc-default 'result arg)))
