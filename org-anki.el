@@ -129,18 +129,21 @@ BODY is the alist json payload, CALLBACK the function to call with result."
 (defun org-anki--entry-content-until-any-heading ()
   "Get entry content until any next heading."
   ;; We move around with regexes, so restore original position
-  (save-excursion
-    ;; Jump to beginning of entry
-    (goto-char (org-entry-beginning-position)) ;; was: (re-search-backward "^\\*+ .*\n")
-    ;; Skip heading
-    (re-search-forward ".*\n")
-    ;; Possibly skip property block until end of entry
-    (re-search-forward ":properties:\\(.*\n\\)*:end:" (org-entry-end-position) t)
-    ;; Get entry content
-    (let ((from (point))
-          (to (progn (outline-next-visible-heading 1) (point))))
-      (buffer-substring-no-properties from to)
-      )))
+  (org-with-wide-buffer
+   ;; Jump to beginning of entry
+   (goto-char (org-entry-beginning-position)) ;; was: (re-search-backward "^\\*+ .*\n")
+   ;; Narrow the entry
+   (org-narrow-to-subtree)
+   ;; Skip heading
+   (re-search-forward ".*\n")
+   ;; Possibly skip property block until end of entry
+   (re-search-forward ":properties:\\(.*\n\\)*:end:" (org-entry-end-position) t)
+   ;; Widen when not previously narrowed
+   (widen)
+   ;; Get entry content
+   (let ((from (point))
+         (to (progn (outline-next-visible-heading 1) (point))))
+     (buffer-substring-no-properties from to) )))
 
 (defun org-anki--string-to-html (string)
   "Convert STRING (org element heading or content) to html."
