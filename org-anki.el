@@ -246,54 +246,55 @@ question and answer are generated from it, and BACK is ignored."
 Tries to add, or update if id property exists, the note."
 
   (interactive)
-  (let* ((front    (org-anki--string-to-html (org-entry-get nil "ITEM")))
-         (tags     (org-anki--get-tags))
-         (maybe-id (org-entry-get nil org-anki-prop-note-id))
-         (deck     (org-anki--find-deck))
-         (back     (org-anki--string-to-html (org-anki--entry-content-until-any-heading))))
+  (org-with-wide-buffer
+   (let* ((front    (org-anki--string-to-html (org-entry-get nil "ITEM")))
+          (tags     (org-anki--get-tags))
+          (maybe-id (org-entry-get nil org-anki-prop-note-id))
+          (deck     (org-anki--find-deck))
+          (back     (org-anki--string-to-html (org-anki--entry-content-until-any-heading))))
 
-    (cond
-     ;; id property exists, update
-     (maybe-id
+     (cond
+      ;; id property exists, update
+      (maybe-id
        (funcall (async-lambda ()
-        (let*
-            ((current (await (org-anki--get-current-tags maybe-id)))
-             (remove (cl-set-difference current tags :test #'equal))
-             (add (cl-set-difference tags current :test #'equal))
-             )
-          (org-anki-connect-request
-           (org-anki--multi
-            `(,(org-anki--update-note maybe-id front back)
-              ,(org-anki--remove-tags maybe-id remove)
-              ,(org-anki--add-tags    maybe-id add)
-              )
-            )
-           (lambda (arg)
-             (let ((the-error (assoc-default 'error arg)))
-               (if the-error
-                   (org-anki--report-error
-                    "Couldn't update note, received: %s"
-                    the-error)
-                 (message "org-anki says: note succesfully updated!")))))))))
+                  (let*
+                      ((current (await (org-anki--get-current-tags maybe-id)))
+                       (remove (cl-set-difference current tags :test #'equal))
+                       (add (cl-set-difference tags current :test #'equal))
+                       )
+                    (org-anki-connect-request
+                     (org-anki--multi
+                      `(,(org-anki--update-note maybe-id front back)
+                        ,(org-anki--remove-tags maybe-id remove)
+                        ,(org-anki--add-tags    maybe-id add)
+                        )
+                      )
+                     (lambda (arg)
+                       (let ((the-error (assoc-default 'error arg)))
+                         (if the-error
+                             (org-anki--report-error
+                              "Couldn't update note, received: %s"
+                              the-error)
+                           (message "org-anki says: note succesfully updated!")))))))))
 
-     ;; id property doesn't exist, try to create new
-     (t
-      (org-anki-connect-request
-       (org-anki--create-note front back deck tags)
-       (lambda (arg)
-         (let ((the-error (assoc-default 'error arg))
-               (the-result (assoc-default 'result arg)))
-           (cond
-            (the-error
-             (org-anki--report-error
-              "Couldn't add note, received error: %s"
-              the-error))
-            (the-result
-             (org-set-property org-anki-prop-note-id (number-to-string the-result))
-             (message "org-anki says: note succesfully added!"))
-            (t
-             (org-anki--report-error "%s"
-              "Empty response, it should return new note's id."))))))))))
+      ;; id property doesn't exist, try to create new
+      (t
+       (org-anki-connect-request
+        (org-anki--create-note front back deck tags)
+        (lambda (arg)
+          (let ((the-error (assoc-default 'error arg))
+                (the-result (assoc-default 'result arg)))
+            (cond
+             (the-error
+              (org-anki--report-error
+               "Couldn't add note, received error: %s"
+               the-error))
+             (the-result
+              (org-set-property org-anki-prop-note-id (number-to-string the-result))
+              (message "org-anki says: note succesfully added!"))
+             (t
+              (org-anki--report-error "%s"
+                                      "Empty response, it should return new note's id.")))))))))))
 
 ;;;###autoload
 (defun org-anki-delete-entry ()
