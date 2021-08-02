@@ -36,6 +36,8 @@
 (require 'request)
 (require 'org-element)
 (require 'thunk)
+(require 'cl-lib)
+(require 'async-await)
 
 ;; Constants
 
@@ -45,7 +47,8 @@
 ;; Customizable variables
 
 (defcustom org-anki-default-deck nil
-  "Default deck name if none is set on the org item nor as global property"
+  "Default deck name if none is set on the org item nor as global
+property"
   :type '(string)
   :group 'org-anki)
 
@@ -70,61 +73,108 @@ Default NAME is \"PROPERTY\", default BUFFER the current buffer."
   (plist-get (car (cdr (org-anki--global-props name))) :value))
 
 
-;; Talk to AnkiConnect API:
+;; AnkiConnect API
 
 (defun org-anki-connect-request (body callback)
   "Perform HTTP GET request to AnkiConnect's default http://localhost:8765.
 
-BODY is the alist json payload, CALLBACK the function to call with result."
-  (request
-    "http://localhost:8765" ; This is where AnkiConnect add-on listens.
-    :type "GET"
-    :data (json-encode body)
-    :sync t
-    :headers '(("Content-Type" . "application/json"))
-    :parser 'json-read
+BODY is the alist json payload, CALLBACK the function to call
+with result."
+  (let ((json (json-encode `(("version" . 6) ,@body))))
+    (request
+      "http://localhost:8765" ; This is where AnkiConnect add-on listens.
+      :type "GET"
+      :data json
+      :sync t
+      :headers '(("Content-Type" . "application/json"))
+      :parser 'json-read
 
-    :error
-    (cl-function
-     (lambda (&rest _args)
-       (debug "Error response in variable '_args'")))
+      :error
+      (cl-function
+       (lambda (&rest _args)
+         (debug "Error response in variable '_args'")))
 
-    :success
-    (cl-function
-     (lambda (&key data &allow-other-keys)
-       (funcall callback data)))))
+      :success
+      (cl-function
+       (lambda (&key data &allow-other-keys)
+         (funcall callback data))))))
+
+(defun org-anki--get-current-tags (id)
+  (promise-new
+   (lambda (resolve _reject)
+     (org-anki-connect-request
+      (org-anki--notes-info `(,id))
+      (lambda (arg)
+        (let ((the-error (assoc-default 'error arg))
+              (the-result (assoc-default 'result arg))
+              )
+          (if the-error (reject the-error)
+            (let ((tags-v (assoc-default 'tags (aref the-result 0))))
+              (funcall resolve (append tags-v nil))))))))))
+
+;;; JSON payloads
 
 (defun org-anki--body (action params)
   "Wrap ACTION and PARAMS to a json payload AnkiConnect expects."
-  `(("version" . 6)
-    ("action" . ,action)
+  `(("action" . ,action)
     ("params" . ,params)))
 
-(defun org-anki--create-note (front back deck)
-  "Create an `addNote' json structure to be added to DECK with card FRONT and BACK strings."
+(defun org-anki--create-note (front back deck tags)
+  "Create an `addNote' json structure to be added to DECK with
+card FRONT and BACK strings."
   (org-anki--body
    "addNote"
    `(("note" .
       (("deckName" . ,deck)
        ,@(org-anki--to-fields front back)
+       ("tags" . ,(if tags tags ""))
        ("options" .
         (("allowDuplicate" . :json-false)
          ("duplicateScope" . "deck"))))))))
 
 (defun org-anki--update-note (id new-front new-back)
-  "Create an `updateNoteFields' json structure with integer ID, and NEW-FRONT and NEW-BACK strings."
+  "Create an `updateNoteFields' json structure with integer ID,
+and NEW-FRONT and NEW-BACK strings."
   (org-anki--body
    "updateNoteFields"
    `(("note" .
       (("id" . ,id)
        ,@(org-anki--to-fields new-front new-back))))))
 
+(defun org-anki--to-fields (front back)
+  "Convert org item title FRONT and content BACK to json fields
+sent to AnkiConnect. If FRONT contains Cloze syntax then both the
+question and answer are generated from it, and BACK is ignored."
+  (cond
+   ((org-anki--is-cloze front)
+    `(("modelName" . "Cloze")
+      ("fields" . (("Text" . ,front)))))
+   ((org-anki--is-cloze back)
+    `(("modelName" . "Cloze")
+      ("fields" . (("Text" . ,back)))))
+   (t
+    `(("modelName" . "Basic")
+      ("fields" . (("Front" . ,front) ("Back" . ,back)))))))
+
 (defun org-anki--delete-notes (ids)
   "Create an `deleteNotes' json structure with integer IDS list."
   (org-anki--body "deleteNotes" `(("notes" . ,ids))))
 
+(defun org-anki--multi (actions)
+  (org-anki--body "multi" `(("actions" . ,actions))))
 
-;; Get card content from org-mode:
+(defun org-anki--notes-info (note-ids)
+  (org-anki--body "notesInfo" `(("notes" . ,note-ids))))
+
+(defun org-anki--add-tags (note-id tags)
+  (let ((tags_ (mapconcat 'identity tags " ")))
+  (org-anki--body "addTags" `(("notes" ,note-id) ("tags" . ,tags_)))))
+
+(defun org-anki--remove-tags (note-id tags)
+  (let ((tags_ (mapconcat 'identity tags " ")))
+    (org-anki--body "removeTags" `(("notes" ,note-id) ("tags" . ,tags_)))))
+
+;; org-mode
 
 (defun org-anki--entry-content-until-any-heading ()
   "Get entry content until any next heading."
@@ -161,7 +211,13 @@ BODY is the alist json payload, CALLBACK the function to call with result."
      ((stringp org-anki-default-deck) org-anki-default-deck)
      (t (error "No deck name in item nor file nor set as default deck!")))))
 
-;; Cloze
+(defun org-anki--get-tags ()
+  (let ((tags (org-entry-get nil "TAGS")))
+    (cond
+     (tags (split-string tags ":" t))
+     (t nil))))
+
+;;; Cloze
 
 (defun org-anki--is-cloze (text)
   "Check if TEXT has cloze syntax, return nil if not."
@@ -169,19 +225,6 @@ BODY is the alist json payload, CALLBACK the function to call with result."
   (if (string-match "{{c[0-9]+::\\([^:\}]*\\)::\\([^:\}]*\\)}}" text)
       "Cloze"
     nil))
-
-(defun org-anki--to-fields (front back)
-  "Convert org item title FRONT and content BACK to json fields sent to AnkiConnect. If FRONT contains Cloze syntax then both the question and answer are generated from it, and BACK is ignored."
-  (cond
-   ((org-anki--is-cloze front)
-    `(("modelName" . "Cloze")
-      ("fields" . (("Text" . ,front)))))
-   ((org-anki--is-cloze back)
-    `(("modelName" . "Cloze")
-      ("fields" . (("Text" . ,back)))))
-   (t
-    `(("modelName" . "Basic")
-      ("fields" . (("Front" . ,front) ("Back" . ,back)))))))
 
 ;; Stolen from https://github.com/louietan/anki-editor
 (defun org-anki--region-to-cloze (begin end arg hint)
@@ -194,15 +237,17 @@ BODY is the alist json payload, CALLBACK the function to call with result."
                 (unless (string-blank-p hint) (princ (format "::%s" hint)))
                 (princ "}}"))))))
 
-;; Public API, i.e commands what the org-anki user should use:
+;; Interactive commands
 
 ;;;###autoload
 (defun org-anki-sync-entry ()
   "Synchronize single entry.
+
 Tries to add, or update if id property exists, the note."
 
   (interactive)
   (let* ((front    (org-anki--string-to-html (org-entry-get nil "ITEM")))
+         (tags     (org-anki--get-tags))
          (maybe-id (org-entry-get nil org-anki-prop-note-id))
          (deck     (org-anki--find-deck))
          (back     (org-anki--string-to-html (org-anki--entry-content-until-any-heading))))
@@ -210,19 +255,31 @@ Tries to add, or update if id property exists, the note."
     (cond
      ;; id property exists, update
      (maybe-id
-      (org-anki-connect-request
-       (org-anki--update-note maybe-id front back)
-       (lambda (arg)
-         (let ((the-error (assoc-default 'error arg)))
-           (if the-error
-               (org-anki--report-error
-                "Couldn't update note, received: %s"
-                the-error)
-             (message "org-anki says: note succesfully updated!"))))))
+       (funcall (async-lambda ()
+        (let*
+            ((current (await (org-anki--get-current-tags maybe-id)))
+             (remove (cl-set-difference current tags :test #'equal))
+             (add (cl-set-difference tags current :test #'equal))
+             )
+          (org-anki-connect-request
+           (org-anki--multi
+            `(,(org-anki--update-note maybe-id front back)
+              ,(org-anki--remove-tags maybe-id remove)
+              ,(org-anki--add-tags    maybe-id add)
+              )
+            )
+           (lambda (arg)
+             (let ((the-error (assoc-default 'error arg)))
+               (if the-error
+                   (org-anki--report-error
+                    "Couldn't update note, received: %s"
+                    the-error)
+                 (message "org-anki says: note succesfully updated!")))))))))
+
      ;; id property doesn't exist, try to create new
      (t
       (org-anki-connect-request
-       (org-anki--create-note front back deck)
+       (org-anki--create-note front back deck tags)
        (lambda (arg)
          (let ((the-error (assoc-default 'error arg))
                (the-result (assoc-default 'result arg)))
@@ -260,7 +317,8 @@ Will lose scheduling data so be careful"
 ;; Stolen from https://github.com/louietan/anki-editor
 ;;;###autoload
 (defun org-anki-cloze-dwim (&optional arg hint)
-  "Convert current active region or word under cursor to Cloze syntax."
+  "Convert current active region or word under cursor to Cloze
+syntax."
   (interactive "p\nsHint (optional): ")
   (cond
    ((region-active-p)
