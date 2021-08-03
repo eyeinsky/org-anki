@@ -6,7 +6,7 @@
 ;; Version: 0.0.4
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
-;; Package-Requires: ((emacs "24.4") (request "0.3.2"))
+;; Package-Requires: ((emacs "27.1") (request "0.3.2"))
 
 ;; This file is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -31,13 +31,15 @@
 
 ;;; Code:
 
+(require 'async-await)
+(require 'cl-lib)
+(require 'dash)
 (require 'json)
 (require 'org)
-(require 'request)
 (require 'org-element)
+(require 'promise)
+(require 'request)
 (require 'thunk)
-(require 'cl-lib)
-(require 'async-await)
 
 ;; Constants
 
@@ -163,16 +165,15 @@ and NEW-FRONT and NEW-BACK strings."
       (("id" . ,id)
        ,@(org-anki--to-fields new-front new-back))))))
 
-(defun org-anki--update-note (note)
+(async-defun org-anki--update-note (note)
   (let*
       ((current (await (org-anki--get-current-tags (note-maybe-id note))))
        (remove (cl-set-difference current (note-tags note) :test #'equal))
        (add (cl-set-difference (note-tags note) current :test #'equal)))
 
-    (org-anki--multi
-     `(,(org-anki--update-note-single (note-maybe-id note) (note-front note) (note-back note))
-       ,(org-anki--remove-tags (note-maybe-id note) remove)
-       ,(org-anki--add-tags    (note-maybe-id note) add)))))
+    `(,(org-anki--update-note-single (note-maybe-id note) (note-front note) (note-back note))
+      ,@(if remove `(,(org-anki--remove-tags (note-maybe-id note) remove)))
+      ,@(if add `(,(org-anki--add-tags (note-maybe-id note) add))))))
 
 (defun org-anki--to-fields (front back)
   "Convert org item title FRONT and content BACK to json fields
@@ -270,37 +271,82 @@ question and answer are generated from it, and BACK is ignored."
                 (unless (string-blank-p hint) (princ (format "::%s" hint)))
                 (princ "}}"))))))
 
+;; Helpers
+
+(defun org-anki--note-to-actions (note)
+  ;; :: Note -> (Note, [JSON])
+  (cond
+   ((note-maybe-id note) (org-anki--update-note note))
+   (t (promise-new (lambda (resolve _) (funcall resolve `(,(org-anki--create-note-single note))))))))
+
+(defun org-anki--handle-pair (pair)
+  ;; :: ((Note, Action), Result) -> IO ()
+  (let*
+      ((note-with-action (car pair))
+       (note (car note-with-action))
+       (action (cdr note-with-action))
+       (result (car (cdr pair))))
+    (cond
+     ;; added note
+     ((equal "addNote" (assoc-default "action" action))
+      (save-excursion
+        (goto-char (note-point note))
+        (org-set-property org-anki-prop-note-id (number-to-string result))))
+     ;; update note
+     ((equal "updateNoteFields" (assoc-default "action" action))
+      (message "org-anki: note succesfully updated: %s" (note-maybe-id note))))))
+
+(defun org-anki--add-note-to-every-action (note-and-actions)
+  ;; :: (Note, [Action]) -> [(Note, Action)]
+  (let ((note (car note-and-actions))
+        (actions (car (cdr note-and-actions))))
+    (-map (lambda (action) (cons note action)) actions)))
+
+(defun org-anki--sync-notes (notes)
+  ;; :: [Note] -> IO ()
+  "Syncronize NOTES."
+
+  (funcall
+   (async-lambda ()
+     (let*
+         ((vec (await (promise-all (mapcar 'org-anki--note-to-actions notes))))
+          (actions-nested (append vec nil))
+          (actions-nested-with-notes (-zip-lists notes actions-nested))
+          (actions-with-notes
+           (-map
+            'org-anki--add-note-to-every-action
+            actions-nested-with-notes))
+          (actions (-flatten-n 1 actions-with-notes))
+          (actions-no-notes (-map 'cdr actions))
+          (multi (org-anki--multi actions-no-notes)))
+       (org-anki-connect-request
+        multi
+        (lambda (the-result)
+          (let*
+              ((result-list (append the-result nil))
+               (pairs (-zip-lists actions result-list)))
+            (-map 'org-anki--handle-pair (reverse pairs))))
+        (lambda (the-error)
+          (org-anki--report-error
+           "Couldn't update note, received: %s"
+           the-error)))))))
+
 ;; Interactive commands
 
 ;;;###autoload
 (defun org-anki-sync-entry ()
-  "Synchronize single entry.
-
-Tries to add, or update if id property exists, the note."
-
+  ;; :: IO ()
+  "Synchronize entry at point."
   (interactive)
-  (let ((note (org-anki--note-at-point)))
-    (cond
-     ;; id property exists, update
-     ((note-maybe-id note)
-      (funcall
-       (async-lambda ()
-         (org-anki-connect-request
-          (org-anki--multi (await (org-anki--update-note note)))
-          (lambda (_) (message "org-anki says: note succesfully updated!"))
-          (lambda (the-error)
-            (org-anki--report-error
-             "Couldn't update note, received: %s"
-             the-error))))))
+  (org-anki--sync-notes (cons (org-anki--note-at-point) nil)))
 
-     ;; id property doesn't exist, try to create new
-     (t
-      (org-anki-connect-request
-       (org-anki--create-note-single note)
-       (lambda (the-result)
-         (org-set-property org-anki-prop-note-id (number-to-string the-result))
-         (message "org-anki says: note succesfully added!"))
-       (lambda (the-error) (org-anki--report-error "Couldn't add note, received error: %s" the-error)))))))
+;;;###autoload
+(defun org-anki-sync-all (&optional buffer)
+  ;; :: Maybe Buffer -> IO ()
+  "Syncronize all entries in optional BUFFER."
+  (interactive)
+  (with-current-buffer (or buffer (buffer-name))
+    (org-anki--sync-notes (org-map-entries 'org-anki--note-at-point))))
 
 ;;;###autoload
 (defun org-anki-delete-entry ()
