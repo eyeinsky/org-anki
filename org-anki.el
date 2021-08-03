@@ -85,7 +85,6 @@ with result."
       "http://localhost:8765" ; This is where AnkiConnect add-on listens.
       :type "GET"
       :data json
-      :sync t
       :headers '(("Content-Type" . "application/json"))
       :parser 'json-read
 
