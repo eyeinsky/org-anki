@@ -111,6 +111,26 @@ with result."
             (let ((tags-v (assoc-default 'tags (aref the-result 0))))
               (funcall resolve (append tags-v nil))))))))))
 
+;; Note
+
+(cl-defstruct note maybe-id front back tags deck point)
+
+(defun org-anki--note-at-point ()
+  (let
+      ((front (org-anki--string-to-html (org-entry-get nil "ITEM")))
+       (note-start (point))
+       (back (org-anki--string-to-html (org-anki--entry-content-until-any-heading)))
+       (tags (org-anki--get-tags))
+       (deck (org-anki--find-deck))
+       (maybe-id (org-entry-get nil org-anki-prop-note-id)))
+    (make-note
+     :front    front
+     :tags     tags
+     :maybe-id maybe-id
+     :deck     deck
+     :back     back
+     :point    note-start)))
+
 ;;; JSON payloads
 
 (defun org-anki--body (action params)
@@ -118,20 +138,20 @@ with result."
   `(("action" . ,action)
     ("params" . ,params)))
 
-(defun org-anki--create-note (front back deck tags)
+(defun org-anki--create-note-single (note)
   "Create an `addNote' json structure to be added to DECK with
 card FRONT and BACK strings."
   (org-anki--body
    "addNote"
    `(("note" .
-      (("deckName" . ,deck)
-       ,@(org-anki--to-fields front back)
-       ("tags" . ,(if tags tags ""))
+      (("deckName" . ,(note-deck note))
+       ,@(org-anki--to-fields (note-front note) (note-back note))
+       ("tags" . ,(if (note-tags note) (note-tags note) ""))
        ("options" .
         (("allowDuplicate" . :json-false)
          ("duplicateScope" . "deck"))))))))
 
-(defun org-anki--update-note (id new-front new-back)
+(defun org-anki--update-note-single (id new-front new-back)
   "Create an `updateNoteFields' json structure with integer ID,
 and NEW-FRONT and NEW-BACK strings."
   (org-anki--body
@@ -139,6 +159,17 @@ and NEW-FRONT and NEW-BACK strings."
    `(("note" .
       (("id" . ,id)
        ,@(org-anki--to-fields new-front new-back))))))
+
+(defun org-anki--update-note (note)
+  (let*
+      ((current (await (org-anki--get-current-tags (note-maybe-id note))))
+       (remove (cl-set-difference current (note-tags note) :test #'equal))
+       (add (cl-set-difference (note-tags note) current :test #'equal)))
+
+    (org-anki--multi
+     `(,(org-anki--update-note-single (note-maybe-id note) (note-front note) (note-back note))
+       ,(org-anki--remove-tags (note-maybe-id note) remove)
+       ,(org-anki--add-tags    (note-maybe-id note) add)))))
 
 (defun org-anki--to-fields (front back)
   "Convert org item title FRONT and content BACK to json fields
@@ -245,40 +276,26 @@ question and answer are generated from it, and BACK is ignored."
 Tries to add, or update if id property exists, the note."
 
   (interactive)
-  (let* ((front    (org-anki--string-to-html (org-entry-get nil "ITEM")))
-         (tags     (org-anki--get-tags))
-         (maybe-id (org-entry-get nil org-anki-prop-note-id))
-         (deck     (org-anki--find-deck))
-         (back     (org-anki--string-to-html (org-anki--entry-content-until-any-heading))))
-
+  (let ((note (org-anki--note-at-point)))
     (cond
      ;; id property exists, update
-     (maybe-id
-       (funcall (async-lambda ()
-        (let*
-            ((current (await (org-anki--get-current-tags maybe-id)))
-             (remove (cl-set-difference current tags :test #'equal))
-             (add (cl-set-difference tags current :test #'equal))
-             )
-          (org-anki-connect-request
-           (org-anki--multi
-            `(,(org-anki--update-note maybe-id front back)
-              ,(org-anki--remove-tags maybe-id remove)
-              ,(org-anki--add-tags    maybe-id add)
-              )
-            )
-           (lambda (arg)
-             (let ((the-error (assoc-default 'error arg)))
-               (if the-error
-                   (org-anki--report-error
-                    "Couldn't update note, received: %s"
-                    the-error)
-                 (message "org-anki says: note succesfully updated!")))))))))
+     ((note-maybe-id note)
+      (funcall
+       (async-lambda ()
+         (org-anki-connect-request
+          (org-anki--update-note note)
+          (lambda (arg)
+            (let ((the-error (assoc-default 'error arg)))
+              (if the-error
+                  (org-anki--report-error
+                   "Couldn't update note, received: %s"
+                   the-error)
+                (message "org-anki says: note succesfully updated!"))))))))
 
      ;; id property doesn't exist, try to create new
      (t
       (org-anki-connect-request
-       (org-anki--create-note front back deck tags)
+       (org-anki--create-note-single note)
        (lambda (arg)
          (let ((the-error (assoc-default 'error arg))
                (the-result (assoc-default 'result arg)))
