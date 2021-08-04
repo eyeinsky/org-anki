@@ -227,7 +227,7 @@ question and answer are generated from it, and BACK is ignored."
 
 (defun org-anki--string-to-html (string)
   "Convert STRING (org element heading or content) to html."
-  (org-export-string-as string 'html t '(:with-toc nil)))
+  (save-excursion (org-export-string-as string 'html t '(:with-toc nil))))
 
 (defun org-anki--report-error (format error)
   "FORMAT the ERROR and prefix it with `org-anki error'."
