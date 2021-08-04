@@ -75,7 +75,7 @@ Default NAME is \"PROPERTY\", default BUFFER the current buffer."
 
 ;; AnkiConnect API
 
-(defun org-anki-connect-request (body callback)
+(defun org-anki-connect-request (body on-result on-error)
   "Perform HTTP GET request to AnkiConnect's default http://localhost:8765.
 
 BODY is the alist json payload, CALLBACK the function to call
@@ -96,20 +96,23 @@ with result."
       :success
       (cl-function
        (lambda (&key data &allow-other-keys)
-         (funcall callback data))))))
+         (let ((the-error (assoc-default 'error data))
+               (the-result (assoc-default 'result data)))
+           (if the-error
+               (if on-error
+                   (funcall on-error the-error)
+                 (error "Unhandled error: %s" the-error))
+           (funcall on-result the-result))))))))
 
 (defun org-anki--get-current-tags (id)
   (promise-new
    (lambda (resolve _reject)
      (org-anki-connect-request
       (org-anki--notes-info `(,id))
-      (lambda (arg)
-        (let ((the-error (assoc-default 'error arg))
-              (the-result (assoc-default 'result arg))
-              )
-          (if the-error (reject the-error)
-            (let ((tags-v (assoc-default 'tags (aref the-result 0))))
-              (funcall resolve (append tags-v nil))))))))))
+      (lambda (the-result)
+        (let ((tags-v (assoc-default 'tags (aref the-result 0))))
+          (funcall resolve (append tags-v nil))))
+      (lambda (the-error) (reject the-error))))))
 
 ;; Note
 
@@ -283,33 +286,21 @@ Tries to add, or update if id property exists, the note."
       (funcall
        (async-lambda ()
          (org-anki-connect-request
-          (org-anki--update-note note)
-          (lambda (arg)
-            (let ((the-error (assoc-default 'error arg)))
-              (if the-error
-                  (org-anki--report-error
-                   "Couldn't update note, received: %s"
-                   the-error)
-                (message "org-anki says: note succesfully updated!"))))))))
+          (org-anki--multi (await (org-anki--update-note note)))
+          (lambda (_) (message "org-anki says: note succesfully updated!"))
+          (lambda (the-error)
+            (org-anki--report-error
+             "Couldn't update note, received: %s"
+             the-error))))))
 
      ;; id property doesn't exist, try to create new
      (t
       (org-anki-connect-request
        (org-anki--create-note-single note)
-       (lambda (arg)
-         (let ((the-error (assoc-default 'error arg))
-               (the-result (assoc-default 'result arg)))
-           (cond
-            (the-error
-             (org-anki--report-error
-              "Couldn't add note, received error: %s"
-              the-error))
-            (the-result
-             (org-set-property org-anki-prop-note-id (number-to-string the-result))
-             (message "org-anki says: note succesfully added!"))
-            (t
-             (org-anki--report-error "%s"
-              "Empty response, it should return new note's id."))))))))))
+       (lambda (the-result)
+         (org-set-property org-anki-prop-note-id (number-to-string the-result))
+         (message "org-anki says: note succesfully added!"))
+       (lambda (the-error) (org-anki--report-error "Couldn't add note, received error: %s" the-error)))))))
 
 ;;;###autoload
 (defun org-anki-delete-entry ()
@@ -321,14 +312,11 @@ Will lose scheduling data so be careful"
       ((note-id (string-to-number (org-entry-get nil org-anki-prop-note-id))))
     (org-anki-connect-request
      (org-anki--delete-notes `(,note-id))
-     (lambda (arg)
-       (let ((the-error (assoc-default 'error arg)))
-         (cond
-          (the-error
-           (error "Couldn't delete note, received error: %s" the-error))
-          (t
-           (org-delete-property org-anki-prop-note-id)
-           (message "org-anki says: note successfully deleted!"))))))))
+     (lambda (the-result)
+       (org-delete-property org-anki-prop-note-id)
+       (message "org-anki says: note successfully deleted!"))
+     (lambda (the-error)
+       (error "Couldn't delete note, received error: %s" the-error)))))
 
 ;; Stolen from https://github.com/louietan/anki-editor
 ;;;###autoload
