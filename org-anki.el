@@ -331,6 +331,25 @@ question and answer are generated from it, and BACK is ignored."
            "Couldn't update note, received: %s"
            the-error)))))))
 
+(defun org-anki--delete-notes_ (notes)
+  ;; :: [Note] -> IO ()
+  (let ((ids (-map 'note-maybe-id notes)))
+    (if ids
+        (org-anki-connect-request
+         (org-anki--delete-notes ids)
+         (lambda (_)
+           (-map
+            (lambda (note)
+              (save-excursion
+                (goto-char (note-point note))
+                (org-delete-property org-anki-prop-note-id)))
+            (reverse notes))
+           )
+         (lambda (the-error)
+           (org-anki--report-error
+            "org-anki-delete-all error: %s"
+            the-error))))))
+
 ;; Interactive commands
 
 ;;;###autoload
@@ -350,19 +369,19 @@ question and answer are generated from it, and BACK is ignored."
 
 ;;;###autoload
 (defun org-anki-delete-entry ()
-  "Delete org entry under cursor (the id property must exist).
-
-Will lose scheduling data so be careful"
+  ;; :: IO ()
+  "Delete org entry under cursor."
   (interactive)
-  (let*
-      ((note-id (string-to-number (org-entry-get nil org-anki-prop-note-id))))
-    (org-anki-connect-request
-     (org-anki--delete-notes `(,note-id))
-     (lambda (the-result)
-       (org-delete-property org-anki-prop-note-id)
-       (message "org-anki says: note successfully deleted!"))
-     (lambda (the-error)
-       (error "Couldn't delete note, received error: %s" the-error)))))
+  (org-anki--delete-notes_ (cons (org-anki--note-at-point) nil)))
+
+(defun org-anki-delete-all (&optional buffer)
+  "Delete all entries in BUFFER, use current buffer if not specified."
+  ;; :: Maybe Buffer -> IO ()
+  (interactive)
+  (with-current-buffer (or buffer (buffer-name))
+    (org-anki--delete-notes_
+     (org-map-entries 'org-anki--note-at-point "ANKI_NOTE_ID<>\"\""))))
+
 
 ;; Stolen from https://github.com/louietan/anki-editor
 ;;;###autoload
