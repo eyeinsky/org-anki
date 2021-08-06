@@ -31,7 +31,6 @@
 
 ;;; Code:
 
-(require 'async-await)
 (require 'cl-lib)
 (require 'dash)
 (require 'json)
@@ -106,15 +105,19 @@ with result."
                  (error "Unhandled error: %s" the-error))
            (funcall on-result the-result))))))))
 
-(defun org-anki--get-current-tags (id)
+(defun org-anki--get-current-tags (ids)
+  ;; :: [Id] -> Promise [[Tag]]
   (promise-new
-   (lambda (resolve _reject)
+   (lambda (resolve reject)
      (org-anki-connect-request
-      (org-anki--notes-info `(,id))
+      (org-anki--notes-info ids)
       (lambda (the-result)
-        (let ((tags-v (assoc-default 'tags (aref the-result 0))))
-          (funcall resolve (append tags-v nil))))
-      (lambda (the-error) (reject the-error))))))
+        (funcall
+         resolve
+         (-map
+          (lambda (arg) (append (assoc-default 'tags arg) nil))
+          (append the-result nil))))
+      (lambda (the-error) (funcall reject the-error))))))
 
 ;; Note
 
@@ -131,7 +134,7 @@ with result."
     (make-org-anki--note
      :front    front
      :tags     tags
-     :maybe-id maybe-id
+     :maybe-id (if (stringp maybe-id) (string-to-number maybe-id))
      :deck     deck
      :back     back
      :point    note-start)))
@@ -156,24 +159,27 @@ card FRONT and BACK strings."
         (("allowDuplicate" . :json-false)
          ("duplicateScope" . "deck"))))))))
 
-(defun org-anki--update-note-single (id new-front new-back)
+(defun org-anki--update-note-single (note)
   "Create an `updateNoteFields' json structure with integer ID,
 and NEW-FRONT and NEW-BACK strings."
   (org-anki--body
    "updateNoteFields"
    `(("note" .
-      (("id" . ,id)
-       ,@(org-anki--to-fields new-front new-back))))))
+      (("id" . ,(org-anki--note-maybe-id note))
+       ,@(org-anki--to-fields
+          (org-anki--note-front note)
+          (org-anki--note-back note)))))))
 
-(async-defun org-anki--update-note (note)
+(defun org-anki--tag-diff (current note)
+  ;; :: [Tag] -> [Tag] -> [Action]
   (let*
-      ((current (await (org-anki--get-current-tags (org-anki--note-maybe-id note))))
-       (remove (cl-set-difference current (org-anki--note-tags note) :test #'equal))
-       (add (cl-set-difference (org-anki--note-tags note) current :test #'equal)))
-
-    `(,(org-anki--update-note-single (org-anki--note-maybe-id note) (org-anki--note-front note) (org-anki--note-back note))
-      ,@(if remove `(,(org-anki--remove-tags (org-anki--note-maybe-id note) remove)))
-      ,@(if add `(,(org-anki--add-tags (org-anki--note-maybe-id note) add))))))
+      ((new (org-anki--note-tags note))
+       (remove (cl-set-difference current new :test #'equal))
+       (add (cl-set-difference new current :test #'equal)))
+    `(,@(if remove
+            `(,(org-anki--remove-tags (org-anki--note-maybe-id note) remove)))
+      ,@(if add
+            `(,(org-anki--add-tags (org-anki--note-maybe-id note) add))))))
 
 (defun org-anki--to-fields (front back)
   "Convert org item title FRONT and content BACK to json fields
@@ -273,11 +279,23 @@ question and answer are generated from it, and BACK is ignored."
 
 ;; Helpers
 
-(defun org-anki--note-to-actions (note)
-  ;; :: Note -> (Note, [JSON])
-  (cond
-   ((org-anki--note-maybe-id note) (org-anki--update-note note))
-   (t (promise-new (lambda (resolve _) (funcall resolve `(,(org-anki--create-note-single note))))))))
+(defun -partition (fn list)
+  (seq-reduce
+   (lambda (acc e)
+     (let*
+         ((res (funcall fn e))
+          (label (car res))
+          (value (cdr res))
+          (lefts (car acc))
+          (rights (cdr acc)))
+       (cond
+        ((equal label :left) `(,(cons value lefts) . ,rights))
+        ((equal label :right) `(,lefts . ,(cons value rights))))))
+   list '(nil . nil)))
+
+(defun org-anki--get-point (note-action-result)
+  ;; :: ((Note, Action), Result) -> Point
+  (org-anki--note-point (car (car note-action-result))))
 
 (defun org-anki--handle-pair (pair)
   ;; :: ((Note, Action), Result) -> IO ()
@@ -302,34 +320,80 @@ question and answer are generated from it, and BACK is ignored."
         (actions (car (cdr note-and-actions))))
     (-map (lambda (action) (cons note action)) actions)))
 
+(defun org-anki--existing-tags (notes)
+  ;; :: [Note] -> Promise (AList Id [Tag])
+  (promise-new
+   (lambda (resolve reject)
+     (let ((existing (-filter 'org-anki--note-maybe-id notes)))
+       (if existing
+           (let ((ids (-map 'org-anki--note-maybe-id existing)))
+             (promise-chain (org-anki--get-current-tags ids)
+               (then (lambda (existing-tags)
+                       (funcall resolve (-zip-with 'cons ids existing-tags))))
+               (promise-catch (lambda (reason) (funcall reject reason)))))
+         (funcall resolve nil))))))
+
 (defun org-anki--sync-notes (notes)
   ;; :: [Note] -> IO ()
   "Syncronize NOTES."
 
-  (funcall
-   (async-lambda ()
-     (let*
-         ((vec (await (promise-all (mapcar 'org-anki--note-to-actions notes))))
-          (actions-nested (append vec nil))
-          (actions-nested-with-notes (-zip-lists notes actions-nested))
-          (actions-with-notes
-           (-map
-            'org-anki--add-note-to-every-action
-            actions-nested-with-notes))
-          (actions (-flatten-n 1 actions-with-notes))
-          (actions-no-notes (-map 'cdr actions))
-          (multi (org-anki--multi actions-no-notes)))
-       (org-anki-connect-request
-        multi
-        (lambda (the-result)
-          (let*
-              ((result-list (append the-result nil))
-               (pairs (-zip-lists actions result-list)))
-            (-map 'org-anki--handle-pair (reverse pairs))))
-        (lambda (the-error)
-          (org-anki--report-error
-           "Couldn't update note, received: %s"
-           the-error)))))))
+  (promise-chain
+      (org-anki--existing-tags notes)
+    (then
+     (lambda (existing-tags)
+       (let*
+           ((notes-and-actions
+             (-partition
+              (lambda (note)
+                (cond
+                 ((org-anki--note-maybe-id note)
+                  (cons
+                   :right
+                   (cons note (org-anki--update-note-single note))))
+                 (t
+                  (cons
+                   :left
+                   (cons note (org-anki--create-note-single note))))))
+              notes))
+            (adds (car notes-and-actions)) ;; [(Note, Action)]
+            (updates (cdr notes-and-actions)) ;; [(Note, Action)]
+            (notes-and-tag-actions ;; [(Note, [Action])]
+             (-map
+              (lambda (note-and-action)
+                (let* ((note (car note-and-action))
+                       (existing
+                        (cdr (assq (org-anki--note-maybe-id note) existing-tags))))
+                  (cons note (org-anki--tag-diff existing note))))
+              updates))
+            (notes-and-tag-actions2 ;; [(Note, Action)]
+             (-mapcat
+              (lambda (pair)
+                (let ((note (car pair))
+                      (actions (cdr pair))
+                      )
+                  (--map (cons note it) actions)
+                  )) notes-and-tag-actions))
+            (note-action-pairs (-concat adds updates notes-and-tag-actions2))
+            (actions (--map (cdr it) note-action-pairs)))
+
+         (org-anki-connect-request
+          (org-anki--multi actions)
+          (lambda (the-result)
+            (let*
+                ((result-list (append the-result nil))
+                 (pairs (-zip-lists note-action-pairs result-list))
+                 (sorted
+                  (-sort
+                   (lambda (a b)
+                     (> (org-anki--get-point a) (org-anki--get-point b)))
+                   pairs))
+                 )
+              (-map 'org-anki--handle-pair sorted)))
+          (lambda (the-error)
+            (org-anki--report-error
+             "Couldn't update note, received: %s"
+             the-error))))))
+    (promise-catch (lambda (reason) (error reason)))))
 
 (defun org-anki--delete-notes_ (notes)
   ;; :: [Note] -> IO ()
@@ -381,7 +445,6 @@ question and answer are generated from it, and BACK is ignored."
   (with-current-buffer (or buffer (buffer-name))
     (org-anki--delete-notes_
      (org-map-entries 'org-anki--note-at-point "ANKI_NOTE_ID<>\"\""))))
-
 
 ;; Stolen from https://github.com/louietan/anki-editor
 ;;;###autoload
