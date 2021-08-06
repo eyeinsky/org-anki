@@ -118,7 +118,7 @@ with result."
 
 ;; Note
 
-(cl-defstruct note maybe-id front back tags deck point)
+(cl-defstruct org-anki--note maybe-id front back tags deck point)
 
 (defun org-anki--note-at-point ()
   (let
@@ -128,7 +128,7 @@ with result."
        (tags (org-anki--get-tags))
        (deck (org-anki--find-deck))
        (maybe-id (org-entry-get nil org-anki-prop-note-id)))
-    (make-note
+    (make-org-anki--note
      :front    front
      :tags     tags
      :maybe-id maybe-id
@@ -149,9 +149,9 @@ card FRONT and BACK strings."
   (org-anki--body
    "addNote"
    `(("note" .
-      (("deckName" . ,(note-deck note))
-       ,@(org-anki--to-fields (note-front note) (note-back note))
-       ("tags" . ,(if (note-tags note) (note-tags note) ""))
+      (("deckName" . ,(org-anki--note-deck note))
+       ,@(org-anki--to-fields (org-anki--note-front note) (org-anki--note-back note))
+       ("tags" . ,(if (org-anki--note-tags note) (org-anki--note-tags note) ""))
        ("options" .
         (("allowDuplicate" . :json-false)
          ("duplicateScope" . "deck"))))))))
@@ -167,13 +167,13 @@ and NEW-FRONT and NEW-BACK strings."
 
 (async-defun org-anki--update-note (note)
   (let*
-      ((current (await (org-anki--get-current-tags (note-maybe-id note))))
-       (remove (cl-set-difference current (note-tags note) :test #'equal))
-       (add (cl-set-difference (note-tags note) current :test #'equal)))
+      ((current (await (org-anki--get-current-tags (org-anki--note-maybe-id note))))
+       (remove (cl-set-difference current (org-anki--note-tags note) :test #'equal))
+       (add (cl-set-difference (org-anki--note-tags note) current :test #'equal)))
 
-    `(,(org-anki--update-note-single (note-maybe-id note) (note-front note) (note-back note))
-      ,@(if remove `(,(org-anki--remove-tags (note-maybe-id note) remove)))
-      ,@(if add `(,(org-anki--add-tags (note-maybe-id note) add))))))
+    `(,(org-anki--update-note-single (org-anki--note-maybe-id note) (org-anki--note-front note) (org-anki--note-back note))
+      ,@(if remove `(,(org-anki--remove-tags (org-anki--note-maybe-id note) remove)))
+      ,@(if add `(,(org-anki--add-tags (org-anki--note-maybe-id note) add))))))
 
 (defun org-anki--to-fields (front back)
   "Convert org item title FRONT and content BACK to json fields
@@ -276,7 +276,7 @@ question and answer are generated from it, and BACK is ignored."
 (defun org-anki--note-to-actions (note)
   ;; :: Note -> (Note, [JSON])
   (cond
-   ((note-maybe-id note) (org-anki--update-note note))
+   ((org-anki--note-maybe-id note) (org-anki--update-note note))
    (t (promise-new (lambda (resolve _) (funcall resolve `(,(org-anki--create-note-single note))))))))
 
 (defun org-anki--handle-pair (pair)
@@ -290,11 +290,11 @@ question and answer are generated from it, and BACK is ignored."
      ;; added note
      ((equal "addNote" (assoc-default "action" action))
       (save-excursion
-        (goto-char (note-point note))
+        (goto-char (org-anki--note-point note))
         (org-set-property org-anki-prop-note-id (number-to-string result))))
      ;; update note
      ((equal "updateNoteFields" (assoc-default "action" action))
-      (message "org-anki: note succesfully updated: %s" (note-maybe-id note))))))
+      (message "org-anki: note succesfully updated: %s" (org-anki--note-maybe-id note))))))
 
 (defun org-anki--add-note-to-every-action (note-and-actions)
   ;; :: (Note, [Action]) -> [(Note, Action)]
@@ -333,7 +333,7 @@ question and answer are generated from it, and BACK is ignored."
 
 (defun org-anki--delete-notes_ (notes)
   ;; :: [Note] -> IO ()
-  (let ((ids (-map 'note-maybe-id notes)))
+  (let ((ids (-map 'org-anki--note-maybe-id notes)))
     (if ids
         (org-anki-connect-request
          (org-anki--delete-notes ids)
@@ -341,7 +341,7 @@ question and answer are generated from it, and BACK is ignored."
            (-map
             (lambda (note)
               (save-excursion
-                (goto-char (note-point note))
+                (goto-char (org-anki--note-point note))
                 (org-delete-property org-anki-prop-note-id)))
             (reverse notes))
            )
