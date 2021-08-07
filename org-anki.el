@@ -3,7 +3,7 @@
 ;; Copyright (C) 2021 Markus Läll
 ;;
 ;; URL: https://github.com/eyeinsky/org-anki
-;; Version: 0.0.4
+;; Version: 0.0.5
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
 ;; Package-Requires: ((emacs "24.4") (request "0.3.2"))
@@ -256,15 +256,16 @@ Tries to add, or update if id property exists, the note."
      (maybe-id
        (funcall (async-lambda ()
         (let*
-            ((current (await (org-anki--get-current-tags maybe-id)))
+            ((id (string-to-number maybe-id))
+             (current (await (org-anki--get-current-tags id)))
              (remove (cl-set-difference current tags :test #'equal))
              (add (cl-set-difference tags current :test #'equal))
              )
           (org-anki-connect-request
            (org-anki--multi
-            `(,(org-anki--update-note maybe-id front back)
-              ,(org-anki--remove-tags maybe-id remove)
-              ,(org-anki--add-tags    maybe-id add)
+            `(,(org-anki--update-note id front back)
+              ,(org-anki--remove-tags id remove)
+              ,(org-anki--add-tags    id add)
               )
             )
            (lambda (arg)
