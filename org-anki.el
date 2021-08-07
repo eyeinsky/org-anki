@@ -44,12 +44,18 @@
 
 (defconst org-anki-prop-note-id "ANKI_NOTE_ID")
 (defconst org-anki-prop-deck "ANKI_DECK")
+(defconst org-anki-match "ANKI_MATCH")
 
 ;; Customizable variables
 
 (defcustom org-anki-default-deck nil
   "Default deck name if none is set on the org item nor as global
 property"
+  :type '(string)
+  :group 'org-anki)
+
+(defcustom org-anki-default-match nil
+  "Default match used in `org-map-entries` for sync all."
   :type '(string)
   :group 'org-anki)
 
@@ -251,6 +257,11 @@ question and answer are generated from it, and BACK is ignored."
      ((stringp org-anki-default-deck) org-anki-default-deck)
      (t (error "No deck name in item nor file nor set as default deck!")))))
 
+(defun org-anki--get-match ()
+  (let
+   ((file-global (org-anki--get-global-prop org-anki-match)))
+    (if (stringp file-global) file-global org-anki-default-match)))
+
 (defun org-anki--get-tags ()
   (let ((tags (org-entry-get nil "TAGS")))
     (cond
@@ -337,63 +348,64 @@ question and answer are generated from it, and BACK is ignored."
   ;; :: [Note] -> IO ()
   "Syncronize NOTES."
 
-  (promise-chain
-      (org-anki--existing-tags notes)
-    (then
-     (lambda (existing-tags)
-       (let*
-           ((notes-and-actions
-             (-partition
-              (lambda (note)
-                (cond
-                 ((org-anki--note-maybe-id note)
-                  (cons
-                   :right
-                   (cons note (org-anki--update-note-single note))))
-                 (t
-                  (cons
-                   :left
-                   (cons note (org-anki--create-note-single note))))))
-              notes))
-            (adds (car notes-and-actions)) ;; [(Note, Action)]
-            (updates (cdr notes-and-actions)) ;; [(Note, Action)]
-            (notes-and-tag-actions ;; [(Note, [Action])]
-             (-map
-              (lambda (note-and-action)
-                (let* ((note (car note-and-action))
-                       (existing
-                        (cdr (assq (org-anki--note-maybe-id note) existing-tags))))
-                  (cons note (org-anki--tag-diff existing note))))
-              updates))
-            (notes-and-tag-actions2 ;; [(Note, Action)]
-             (-mapcat
-              (lambda (pair)
-                (let ((note (car pair))
-                      (actions (cdr pair))
-                      )
-                  (--map (cons note it) actions)
-                  )) notes-and-tag-actions))
-            (note-action-pairs (-concat adds updates notes-and-tag-actions2))
-            (actions (--map (cdr it) note-action-pairs)))
+  (if notes
+      (promise-chain
+          (org-anki--existing-tags notes)
+        (then
+         (lambda (existing-tags)
+           (let*
+               ((notes-and-actions
+                 (-partition
+                  (lambda (note)
+                    (cond
+                     ((org-anki--note-maybe-id note)
+                      (cons
+                       :right
+                       (cons note (org-anki--update-note-single note))))
+                     (t
+                      (cons
+                       :left
+                       (cons note (org-anki--create-note-single note))))))
+                  notes))
+                (adds (car notes-and-actions)) ;; [(Note, Action)]
+                (updates (cdr notes-and-actions)) ;; [(Note, Action)]
+                (notes-and-tag-actions ;; [(Note, [Action])]
+                 (-map
+                  (lambda (note-and-action)
+                    (let* ((note (car note-and-action))
+                           (existing
+                            (cdr (assq (org-anki--note-maybe-id note) existing-tags))))
+                      (cons note (org-anki--tag-diff existing note))))
+                  updates))
+                (notes-and-tag-actions2 ;; [(Note, Action)]
+                 (-mapcat
+                  (lambda (pair)
+                    (let ((note (car pair))
+                          (actions (cdr pair))
+                          )
+                      (--map (cons note it) actions)
+                      )) notes-and-tag-actions))
+                (note-action-pairs (-concat adds updates notes-and-tag-actions2))
+                (actions (--map (cdr it) note-action-pairs)))
 
-         (org-anki-connect-request
-          (org-anki--multi actions)
-          (lambda (the-result)
-            (let*
-                ((result-list (append the-result nil))
-                 (pairs (-zip-lists note-action-pairs result-list))
-                 (sorted
-                  (-sort
-                   (lambda (a b)
-                     (> (org-anki--get-point a) (org-anki--get-point b)))
-                   pairs))
-                 )
-              (-map 'org-anki--handle-pair sorted)))
-          (lambda (the-error)
-            (org-anki--report-error
-             "Couldn't update note, received: %s"
-             the-error))))))
-    (promise-catch (lambda (reason) (error reason)))))
+             (org-anki-connect-request
+              (org-anki--multi actions)
+              (lambda (the-result)
+                (let*
+                    ((result-list (append the-result nil))
+                     (pairs (-zip-lists note-action-pairs result-list))
+                     (sorted
+                      (-sort
+                       (lambda (a b)
+                         (> (org-anki--get-point a) (org-anki--get-point b)))
+                       pairs))
+                     )
+                  (-map 'org-anki--handle-pair sorted)))
+              (lambda (the-error)
+                (org-anki--report-error
+                 "Couldn't update note, received: %s"
+                 the-error))))))
+        (promise-catch (lambda (reason) (error reason))))))
 
 (defun org-anki--delete-notes_ (notes)
   ;; :: [Note] -> IO ()
@@ -429,7 +441,8 @@ question and answer are generated from it, and BACK is ignored."
   "Syncronize all entries in optional BUFFER."
   (interactive)
   (with-current-buffer (or buffer (buffer-name))
-    (org-anki--sync-notes (org-map-entries 'org-anki--note-at-point))))
+    (org-anki--sync-notes
+     (org-map-entries 'org-anki--note-at-point (org-anki--get-match)))))
 
 ;;;###autoload
 (defun org-anki-delete-entry ()
