@@ -1,2 +1,9 @@
-* 0.0.4
+* v0.0.6
+- add commands =org-anki-sync-all= and =org-anki-delete-all=
+- optimize HTTP requests by
+  - fetching all tags for existing entries with one query, and
+  - add or update all notes in the second
+* v0.0.5
+- send number instead of string as note ID format (see #16)
+* v0.0.4
 - synchronize org-mode tags to Anki tags

@@ -3,7 +3,7 @@
 ;; Copyright (C) 2021 Markus Läll
 ;;
 ;; URL: https://github.com/eyeinsky/org-anki
-;; Version: 0.0.4
+;; Version: 0.0.6
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
 ;; Package-Requires: ((emacs "27.1") (request "0.3.2"))
