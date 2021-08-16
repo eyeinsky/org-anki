@@ -4,6 +4,6 @@
   - fetching all tags for existing entries with one query, and
   - add or update all notes in the second
 * v0.0.5
-- send number instead of string as note ID format (see #16)
+- send number instead of string as note ID format (see [[https://github.com/eyeinsky/org-anki/issues/16][#16]])
 * v0.0.4
 - synchronize org-mode tags to Anki tags
