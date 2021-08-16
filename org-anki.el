@@ -3,10 +3,10 @@
 ;; Copyright (C) 2021 Markus Läll
 ;;
 ;; URL: https://github.com/eyeinsky/org-anki
-;; Version: 0.0.5
+;; Version: 0.0.6
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
-;; Package-Requires: ((emacs "24.4") (request "0.3.2"))
+;; Package-Requires: ((emacs "27.1") (request "0.3.2"))
 
 ;; This file is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -31,24 +31,31 @@
 
 ;;; Code:
 
+(require 'cl-lib)
+(require 'dash)
 (require 'json)
 (require 'org)
-(require 'request)
 (require 'org-element)
+(require 'promise)
+(require 'request)
 (require 'thunk)
-(require 'cl-lib)
-(require 'async-await)
 
 ;; Constants
 
 (defconst org-anki-prop-note-id "ANKI_NOTE_ID")
 (defconst org-anki-prop-deck "ANKI_DECK")
+(defconst org-anki-match "ANKI_MATCH")
 
 ;; Customizable variables
 
 (defcustom org-anki-default-deck nil
   "Default deck name if none is set on the org item nor as global
 property"
+  :type '(string)
+  :group 'org-anki)
+
+(defcustom org-anki-default-match nil
+  "Default match used in `org-map-entries` for sync all."
   :type '(string)
   :group 'org-anki)
 
@@ -75,7 +82,7 @@ Default NAME is \"PROPERTY\", default BUFFER the current buffer."
 
 ;; AnkiConnect API
 
-(defun org-anki-connect-request (body callback)
+(defun org-anki-connect-request (body on-result on-error)
   "Perform HTTP GET request to AnkiConnect's default http://localhost:8765.
 
 BODY is the alist json payload, CALLBACK the function to call
@@ -96,20 +103,47 @@ with result."
       :success
       (cl-function
        (lambda (&key data &allow-other-keys)
-         (funcall callback data))))))
+         (let ((the-error (assoc-default 'error data))
+               (the-result (assoc-default 'result data)))
+           (if the-error
+               (if on-error
+                   (funcall on-error the-error)
+                 (error "Unhandled error: %s" the-error))
+           (funcall on-result the-result))))))))
 
-(defun org-anki--get-current-tags (id)
+(defun org-anki--get-current-tags (ids)
+  ;; :: [Id] -> Promise [[Tag]]
   (promise-new
-   (lambda (resolve _reject)
+   (lambda (resolve reject)
      (org-anki-connect-request
-      (org-anki--notes-info `(,id))
-      (lambda (arg)
-        (let ((the-error (assoc-default 'error arg))
-              (the-result (assoc-default 'result arg))
-              )
-          (if the-error (reject the-error)
-            (let ((tags-v (assoc-default 'tags (aref the-result 0))))
-              (funcall resolve (append tags-v nil))))))))))
+      (org-anki--notes-info ids)
+      (lambda (the-result)
+        (funcall
+         resolve
+         (-map
+          (lambda (arg) (append (assoc-default 'tags arg) nil))
+          (append the-result nil))))
+      (lambda (the-error) (funcall reject the-error))))))
+
+;; Note
+
+(cl-defstruct org-anki--note maybe-id front back tags deck point)
+
+(defun org-anki--note-at-point ()
+  (let
+      ((front (org-anki--string-to-html (org-entry-get nil "ITEM")))
+       (note-start (point))
+       (back (org-anki--string-to-html (org-anki--entry-content-until-any-heading)))
+       (tags (org-anki--get-tags))
+       (deck (org-anki--find-deck))
+       (maybe-id (org-entry-get nil org-anki-prop-note-id)))
+    (make-org-anki--note
+     :front    front
+     :tags     tags
+     :maybe-id (if (stringp maybe-id) (string-to-number maybe-id))
+     :deck     deck
+     :back     back
+     :point    note-start)))
 
 ;;; JSON payloads
 
@@ -118,27 +152,40 @@ with result."
   `(("action" . ,action)
     ("params" . ,params)))
 
-(defun org-anki--create-note (front back deck tags)
+(defun org-anki--create-note-single (note)
   "Create an `addNote' json structure to be added to DECK with
 card FRONT and BACK strings."
   (org-anki--body
    "addNote"
    `(("note" .
-      (("deckName" . ,deck)
-       ,@(org-anki--to-fields front back)
-       ("tags" . ,(if tags tags ""))
+      (("deckName" . ,(org-anki--note-deck note))
+       ,@(org-anki--to-fields (org-anki--note-front note) (org-anki--note-back note))
+       ("tags" . ,(if (org-anki--note-tags note) (org-anki--note-tags note) ""))
        ("options" .
         (("allowDuplicate" . :json-false)
          ("duplicateScope" . "deck"))))))))
 
-(defun org-anki--update-note (id new-front new-back)
+(defun org-anki--update-note-single (note)
   "Create an `updateNoteFields' json structure with integer ID,
 and NEW-FRONT and NEW-BACK strings."
   (org-anki--body
    "updateNoteFields"
    `(("note" .
-      (("id" . ,id)
-       ,@(org-anki--to-fields new-front new-back))))))
+      (("id" . ,(org-anki--note-maybe-id note))
+       ,@(org-anki--to-fields
+          (org-anki--note-front note)
+          (org-anki--note-back note)))))))
+
+(defun org-anki--tag-diff (current note)
+  ;; :: [Tag] -> [Tag] -> [Action]
+  (let*
+      ((new (org-anki--note-tags note))
+       (remove (cl-set-difference current new :test #'equal))
+       (add (cl-set-difference new current :test #'equal)))
+    `(,@(if remove
+            `(,(org-anki--remove-tags (org-anki--note-maybe-id note) remove)))
+      ,@(if add
+            `(,(org-anki--add-tags (org-anki--note-maybe-id note) add))))))
 
 (defun org-anki--to-fields (front back)
   "Convert org item title FRONT and content BACK to json fields
@@ -193,7 +240,7 @@ question and answer are generated from it, and BACK is ignored."
 
 (defun org-anki--string-to-html (string)
   "Convert STRING (org element heading or content) to html."
-  (org-export-string-as string 'html t '(:with-toc nil)))
+  (save-excursion (org-export-string-as string 'html t '(:with-toc nil))))
 
 (defun org-anki--report-error (format error)
   "FORMAT the ERROR and prefix it with `org-anki error'."
@@ -209,6 +256,11 @@ question and answer are generated from it, and BACK is ignored."
      ((stringp prop-global) prop-global)
      ((stringp org-anki-default-deck) org-anki-default-deck)
      (t (error "No deck name in item nor file nor set as default deck!")))))
+
+(defun org-anki--get-match ()
+  (let
+   ((file-global (org-anki--get-global-prop org-anki-match)))
+    (if (stringp file-global) file-global org-anki-default-match)))
 
 (defun org-anki--get-tags ()
   (let ((tags (org-entry-get nil "TAGS")))
@@ -236,83 +288,176 @@ question and answer are generated from it, and BACK is ignored."
                 (unless (string-blank-p hint) (princ (format "::%s" hint)))
                 (princ "}}"))))))
 
+;; Helpers
+
+(defun -partition (fn list)
+  (seq-reduce
+   (lambda (acc e)
+     (let*
+         ((res (funcall fn e))
+          (label (car res))
+          (value (cdr res))
+          (lefts (car acc))
+          (rights (cdr acc)))
+       (cond
+        ((equal label :left) `(,(cons value lefts) . ,rights))
+        ((equal label :right) `(,lefts . ,(cons value rights))))))
+   list '(nil . nil)))
+
+(defun org-anki--get-point (note-action-result)
+  ;; :: ((Note, Action), Result) -> Point
+  (org-anki--note-point (car (car note-action-result))))
+
+(defun org-anki--handle-pair (pair)
+  ;; :: ((Note, Action), Result) -> IO ()
+  (let*
+      ((note-with-action (car pair))
+       (note (car note-with-action))
+       (action (cdr note-with-action))
+       (result (car (cdr pair))))
+    (cond
+     ;; added note
+     ((equal "addNote" (assoc-default "action" action))
+      (save-excursion
+        (goto-char (org-anki--note-point note))
+        (org-set-property org-anki-prop-note-id (number-to-string result))))
+     ;; update note
+     ((equal "updateNoteFields" (assoc-default "action" action))
+      (message "org-anki: note succesfully updated: %s" (org-anki--note-maybe-id note))))))
+
+(defun org-anki--add-note-to-every-action (note-and-actions)
+  ;; :: (Note, [Action]) -> [(Note, Action)]
+  (let ((note (car note-and-actions))
+        (actions (car (cdr note-and-actions))))
+    (-map (lambda (action) (cons note action)) actions)))
+
+(defun org-anki--existing-tags (notes)
+  ;; :: [Note] -> Promise (AList Id [Tag])
+  (promise-new
+   (lambda (resolve reject)
+     (let ((existing (-filter 'org-anki--note-maybe-id notes)))
+       (if existing
+           (let ((ids (-map 'org-anki--note-maybe-id existing)))
+             (promise-chain (org-anki--get-current-tags ids)
+               (then (lambda (existing-tags)
+                       (funcall resolve (-zip-with 'cons ids existing-tags))))
+               (promise-catch (lambda (reason) (funcall reject reason)))))
+         (funcall resolve nil))))))
+
+(defun org-anki--sync-notes (notes)
+  ;; :: [Note] -> IO ()
+  "Syncronize NOTES."
+
+  (if notes
+      (promise-chain
+          (org-anki--existing-tags notes)
+        (then
+         (lambda (existing-tags)
+           (let*
+               ((notes-and-actions
+                 (-partition
+                  (lambda (note)
+                    (cond
+                     ((org-anki--note-maybe-id note)
+                      (cons
+                       :right
+                       (cons note (org-anki--update-note-single note))))
+                     (t
+                      (cons
+                       :left
+                       (cons note (org-anki--create-note-single note))))))
+                  notes))
+                (adds (car notes-and-actions)) ;; [(Note, Action)]
+                (updates (cdr notes-and-actions)) ;; [(Note, Action)]
+                (notes-and-tag-actions ;; [(Note, [Action])]
+                 (-map
+                  (lambda (note-and-action)
+                    (let* ((note (car note-and-action))
+                           (existing
+                            (cdr (assq (org-anki--note-maybe-id note) existing-tags))))
+                      (cons note (org-anki--tag-diff existing note))))
+                  updates))
+                (notes-and-tag-actions2 ;; [(Note, Action)]
+                 (-mapcat
+                  (lambda (pair)
+                    (let ((note (car pair))
+                          (actions (cdr pair))
+                          )
+                      (--map (cons note it) actions)
+                      )) notes-and-tag-actions))
+                (note-action-pairs (-concat adds updates notes-and-tag-actions2))
+                (actions (--map (cdr it) note-action-pairs)))
+
+             (org-anki-connect-request
+              (org-anki--multi actions)
+              (lambda (the-result)
+                (let*
+                    ((result-list (append the-result nil))
+                     (pairs (-zip-lists note-action-pairs result-list))
+                     (sorted
+                      (-sort
+                       (lambda (a b)
+                         (> (org-anki--get-point a) (org-anki--get-point b)))
+                       pairs))
+                     )
+                  (-map 'org-anki--handle-pair sorted)))
+              (lambda (the-error)
+                (org-anki--report-error
+                 "Couldn't update note, received: %s"
+                 the-error))))))
+        (promise-catch (lambda (reason) (error reason))))))
+
+(defun org-anki--delete-notes_ (notes)
+  ;; :: [Note] -> IO ()
+  (let ((ids (-map 'org-anki--note-maybe-id notes)))
+    (if ids
+        (org-anki-connect-request
+         (org-anki--delete-notes ids)
+         (lambda (_)
+           (-map
+            (lambda (note)
+              (save-excursion
+                (goto-char (org-anki--note-point note))
+                (org-delete-property org-anki-prop-note-id)))
+            (reverse notes))
+           )
+         (lambda (the-error)
+           (org-anki--report-error
+            "org-anki-delete-all error: %s"
+            the-error))))))
+
 ;; Interactive commands
 
 ;;;###autoload
 (defun org-anki-sync-entry ()
-  "Synchronize single entry.
-
-Tries to add, or update if id property exists, the note."
-
+  ;; :: IO ()
+  "Synchronize entry at point."
   (interactive)
-  (let* ((front    (org-anki--string-to-html (org-entry-get nil "ITEM")))
-         (tags     (org-anki--get-tags))
-         (maybe-id (org-entry-get nil org-anki-prop-note-id))
-         (deck     (org-anki--find-deck))
-         (back     (org-anki--string-to-html (org-anki--entry-content-until-any-heading))))
+  (org-anki--sync-notes (cons (org-anki--note-at-point) nil)))
 
-    (cond
-     ;; id property exists, update
-     (maybe-id
-       (funcall (async-lambda ()
-        (let*
-            ((id (string-to-number maybe-id))
-             (current (await (org-anki--get-current-tags id)))
-             (remove (cl-set-difference current tags :test #'equal))
-             (add (cl-set-difference tags current :test #'equal))
-             )
-          (org-anki-connect-request
-           (org-anki--multi
-            `(,(org-anki--update-note id front back)
-              ,(org-anki--remove-tags id remove)
-              ,(org-anki--add-tags    id add)
-              )
-            )
-           (lambda (arg)
-             (let ((the-error (assoc-default 'error arg)))
-               (if the-error
-                   (org-anki--report-error
-                    "Couldn't update note, received: %s"
-                    the-error)
-                 (message "org-anki says: note succesfully updated!")))))))))
-
-     ;; id property doesn't exist, try to create new
-     (t
-      (org-anki-connect-request
-       (org-anki--create-note front back deck tags)
-       (lambda (arg)
-         (let ((the-error (assoc-default 'error arg))
-               (the-result (assoc-default 'result arg)))
-           (cond
-            (the-error
-             (org-anki--report-error
-              "Couldn't add note, received error: %s"
-              the-error))
-            (the-result
-             (org-set-property org-anki-prop-note-id (number-to-string the-result))
-             (message "org-anki says: note succesfully added!"))
-            (t
-             (org-anki--report-error "%s"
-              "Empty response, it should return new note's id."))))))))))
+;;;###autoload
+(defun org-anki-sync-all (&optional buffer)
+  ;; :: Maybe Buffer -> IO ()
+  "Syncronize all entries in optional BUFFER."
+  (interactive)
+  (with-current-buffer (or buffer (buffer-name))
+    (org-anki--sync-notes
+     (org-map-entries 'org-anki--note-at-point (org-anki--get-match)))))
 
 ;;;###autoload
 (defun org-anki-delete-entry ()
-  "Delete org entry under cursor (the id property must exist).
-
-Will lose scheduling data so be careful"
+  ;; :: IO ()
+  "Delete org entry under cursor."
   (interactive)
-  (let*
-      ((note-id (string-to-number (org-entry-get nil org-anki-prop-note-id))))
-    (org-anki-connect-request
-     (org-anki--delete-notes `(,note-id))
-     (lambda (arg)
-       (let ((the-error (assoc-default 'error arg)))
-         (cond
-          (the-error
-           (error "Couldn't delete note, received error: %s" the-error))
-          (t
-           (org-delete-property org-anki-prop-note-id)
-           (message "org-anki says: note successfully deleted!"))))))))
+  (org-anki--delete-notes_ (cons (org-anki--note-at-point) nil)))
+
+(defun org-anki-delete-all (&optional buffer)
+  "Delete all entries in BUFFER, use current buffer if not specified."
+  ;; :: Maybe Buffer -> IO ()
+  (interactive)
+  (with-current-buffer (or buffer (buffer-name))
+    (org-anki--delete-notes_
+     (org-map-entries 'org-anki--note-at-point "ANKI_NOTE_ID<>\"\""))))
 
 ;; Stolen from https://github.com/louietan/anki-editor
 ;;;###autoload

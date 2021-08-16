@@ -18,9 +18,14 @@ after being synced to Anki.
 
 ** Commands
 - =org-anki-sync-entry= :: adds or updates the current org-entry under
-     cursor
+     cursor.
+- =org-anki-sync-all= :: adds or updates all entries in buffer.
+  Use #+ANKI_MATCH: some_property="some value" at top-of-file to
+  selectively sync matched entries. Syntax is same as the [[https://orgmode.org/manual/Using-the-Mapping-API.html][MATCH argument for org-map-entries]].
 - =org-anki-delete-entry= :: deletes entry from Anki. Entry must have
-     =ANKI_NOTE_ID= property
+     =ANKI_NOTE_ID= property.
+- =org-anki-delete-all= :: delete all entries with =ANKI_NOTE_ID=
+  property set from Anki.
 - =org-anki-cloze-dwim= :: converts a region or word under cursor to
   Cloze syntax, i.e ={{c1::hidden text::hint text}}=. This should be
   used in org entry's title.
