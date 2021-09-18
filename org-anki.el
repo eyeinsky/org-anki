@@ -398,11 +398,35 @@ question and answer are generated from it, and BACK is ignored."
                   (let ((note (car it))
                         (actions (cdr it)))
                     (--map (cons note it) actions))
-                  notes-and-tag-actions))
-                (note-action-pairs (-concat additions updates notes-and-tag-actions2))) ;; [(Note, Action)]
+                  notes-and-tag-actions)))
 
-             (org-anki--execute-api-actions note-action-pairs)
-             )))
+             (if (and (= (length updates) 1) (= (length notes) 1))
+
+                 ;; If there there is only one update, then don't use
+                 ;; multi for that:
+                 (let* ((pair (car updates))
+                        (note (car pair))
+                        (action (cdr pair)))
+
+                   (message "one update" action)
+                   (org-anki-connect-request
+                    action
+                    (lambda (the-result)
+                      (message
+                       "org-anki: note succesfully updated: %s"
+                       (org-anki--note-maybe-id note)))
+                    (lambda (the-error)
+                      (org-anki--report-error
+                       "Couldn't update note, received: %s"
+                       the-error)))
+
+                   ;; Update tags (if any) for the single note, too:
+                   (if notes-and-tag-actions2
+                       (org-anki--execute-api-actions notes-and-tag-actions2)))
+
+               ;; It's not just one updated note, default to multi
+               (let ((note-action-pairs (-concat additions updates notes-and-tag-actions2))) ;; [(Note, Action)]
+                 (org-anki--execute-api-actions note-action-pairs))))))
         (promise-catch (lambda (reason) (error reason))))))
 
 (defun org-anki--delete-notes_ (notes)
