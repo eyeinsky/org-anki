@@ -340,6 +340,26 @@ question and answer are generated from it, and BACK is ignored."
                (promise-catch (lambda (reason) (funcall reject reason)))))
          (funcall resolve nil))))))
 
+(defun org-anki--execute-api-actions (note-action-pairs)
+  (let ((actions (--map (cdr it) note-action-pairs)))
+    (org-anki-connect-request
+     (org-anki--multi actions)
+     (lambda (the-result)
+       (let*
+           ((result-list (append the-result nil))
+            (pairs (-zip-lists note-action-pairs result-list))
+            (sorted
+             (-sort
+              (lambda (a b)
+                (> (org-anki--get-point a) (org-anki--get-point b)))
+              pairs))
+            )
+         (-map 'org-anki--handle-pair sorted)))
+     (lambda (the-error)
+       (org-anki--report-error
+        "Couldn't update note, received: %s"
+        the-error)))))
+
 (defun org-anki--sync-notes (notes)
   ;; :: [Note] -> IO ()
   "Syncronize NOTES."
@@ -379,26 +399,10 @@ question and answer are generated from it, and BACK is ignored."
                         (actions (cdr it)))
                     (--map (cons note it) actions))
                   notes-and-tag-actions))
-                (note-action-pairs (-concat additions updates notes-and-tag-actions2)) ;; [(Note, Action)]
-                (actions (--map (cdr it) note-action-pairs))) ;; [Action]
+                (note-action-pairs (-concat additions updates notes-and-tag-actions2))) ;; [(Note, Action)]
 
-             (org-anki-connect-request
-              (org-anki--multi actions)
-              (lambda (the-result)
-                (let*
-                    ((result-list (append the-result nil))
-                     (pairs (-zip-lists note-action-pairs result-list))
-                     (sorted
-                      (-sort
-                       (lambda (a b)
-                         (> (org-anki--get-point a) (org-anki--get-point b)))
-                       pairs))
-                     )
-                  (-map 'org-anki--handle-pair sorted)))
-              (lambda (the-error)
-                (org-anki--report-error
-                 "Couldn't update note, received: %s"
-                 the-error))))))
+             (org-anki--execute-api-actions note-action-pairs)
+             )))
         (promise-catch (lambda (reason) (error reason))))))
 
 (defun org-anki--delete-notes_ (notes)
