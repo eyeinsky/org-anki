@@ -249,7 +249,7 @@ question and answer are generated from it, and BACK is ignored."
 
 (defun org-anki--find-deck ()
   (thunk-let
-   ((prop-item (org-entry-get nil org-anki-prop-deck))
+   ((prop-item (org-entry-get nil org-anki-prop-deck t))
     (prop-global (org-anki--get-global-prop org-anki-prop-deck)))
     (cond
      ((stringp prop-item) prop-item)
