@@ -146,18 +146,18 @@ with result."
 
 (defun org-anki--note-at-point ()
   (let
-      ((front (org-anki--string-to-html (org-entry-get nil "ITEM")))
-       (note-start (point))
+      ((maybe-id (org-entry-get nil org-anki-prop-note-id))
+       (front (org-anki--string-to-html (org-entry-get nil "ITEM")))
        (back (org-anki--back-post-processing (org-anki--string-to-html (org-anki--entry-content-until-any-heading))))
        (tags (org-anki--get-tags))
-       (deck (org-anki--find-deck))
-       (maybe-id (org-entry-get nil org-anki-prop-note-id)))
+       (deck (org-anki--find-prop org-anki-prop-deck org-anki-default-deck))
+       (note-start (point)))
     (make-org-anki--note
-     :front    front
-     :tags     tags
      :maybe-id (if (stringp maybe-id) (string-to-number maybe-id))
-     :deck     deck
+     :front    front
      :back     back
+     :tags     tags
+     :deck     deck
      :point    note-start)))
 
 ;;; JSON payloads
@@ -174,7 +174,7 @@ card FRONT and BACK strings."
    "addNote"
    `(("note" .
       (("deckName" . ,(org-anki--note-deck note))
-       ,@(org-anki--to-fields (org-anki--note-front note) (org-anki--note-back note))
+       ,@(org-anki--to-fields note)
        ("tags" . ,(if (org-anki--note-tags note) (org-anki--note-tags note) ""))
        ("options" .
         (("allowDuplicate" . :json-false)
@@ -187,9 +187,7 @@ and NEW-FRONT and NEW-BACK strings."
    "updateNoteFields"
    `(("note" .
       (("id" . ,(org-anki--note-maybe-id note))
-       ,@(org-anki--to-fields
-          (org-anki--note-front note)
-          (org-anki--note-back note)))))))
+       ,@(org-anki--to-fields note))))))
 
 (defun org-anki--tag-diff (current note)
   "Calculate new tags that need to be added and tags that need to
@@ -204,20 +202,23 @@ be removed from the Anki app, return actions that do that."
       ,@(if add
             `(,(org-anki--add-tags (org-anki--note-maybe-id note) add))))))
 
-(defun org-anki--to-fields (front back)
+(defun org-anki--to-fields (note)
   "Convert org item title FRONT and content BACK to json fields
 sent to AnkiConnect. If FRONT contains Cloze syntax then both the
 question and answer are generated from it, and BACK is ignored."
-  (cond
-   ((org-anki--is-cloze front)
-    `(("modelName" . "Cloze")
-      ("fields" . (("Text" . ,front)))))
-   ((org-anki--is-cloze back)
-    `(("modelName" . "Cloze")
-      ("fields" . (("Text" . ,back)))))
-   (t
-    `(("modelName" . "Basic")
-      ("fields" . (("Front" . ,front) ("Back" . ,back)))))))
+  (let
+      ((front (org-anki--note-front note))
+       (back (org-anki--note-back note)))
+    (cond
+     ((org-anki--is-cloze front)
+      `(("modelName" . "Cloze")
+        ("fields" . (("Text" . ,front)))))
+     ((org-anki--is-cloze back)
+      `(("modelName" . "Cloze")
+        ("fields" . (("Text" . ,back)))))
+     (t
+      `(("modelName" . "Basic")
+        ("fields" . (("Front" . ,front) ("Back" . ,back))))))))
 
 (defun org-anki--delete-notes (ids)
   "Create an `deleteNotes' json structure with integer IDS list."
@@ -264,15 +265,21 @@ question and answer are generated from it, and BACK is ignored."
   (let ((fmt0 (concat "org-anki error: " format)))
     (message fmt0 error)))
 
-(defun org-anki--find-deck ()
+(defun org-anki--find-prop (name default)
+  "Find property with NAME from
+1. item,
+2. inherited from parents
+3. as in-buffer setting
+4. otherwise use DEFAULT"
   (thunk-let
-   ((prop-item (org-entry-get nil org-anki-prop-deck t))
-    (prop-global (org-anki--get-global-prop org-anki-prop-deck)))
+   ((prop-item (org-entry-get nil prop-name t))
+    (prop-global (org-anki--get-global-prop prop-name)))
     (cond
      ((stringp prop-item) prop-item)
      ((stringp prop-global) prop-global)
-     ((stringp org-anki-default-deck) org-anki-default-deck)
-     (t (error "No deck name in item nor file nor set as default deck!")))))
+     ((stringp prop-default) prop-default)
+     (t (error "No property '%s' in item nor file nor set as default!"
+               prop-name)))))
 
 (defun org-anki--get-match ()
   (let
