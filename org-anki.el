@@ -129,11 +129,11 @@ with result."
 
 (cl-defstruct org-anki--note maybe-id front back tags deck point)
 
-(defun org-anki-back-post-processing (text)
-  (org-anki-string-to-anki-mathjax text)
+(defun org-anki--back-post-processing (text)
+  (org-anki--string-to-anki-mathjax text)
   )
 
-(defun org-anki-string-to-anki-mathjax (latex-code)
+(defun org-anki--string-to-anki-mathjax (latex-code)
   (let ((delimiter-map (list (cons (regexp-quote "\\begin{equation}") "\\\\[")
                              (cons (regexp-quote "\\end{equation}") "\\\\]")
                              (cons (regexp-quote "\\begin{align}") "\\\\[\n\\\\begin{aligned}")
@@ -148,7 +148,7 @@ with result."
   (let
       ((front (org-anki--string-to-html (org-entry-get nil "ITEM")))
        (note-start (point))
-       (back (org-anki-back-post-processing (org-anki--string-to-html (org-anki--entry-content-until-any-heading))))
+       (back (org-anki--back-post-processing (org-anki--string-to-html (org-anki--entry-content-until-any-heading))))
        (tags (org-anki--get-tags))
        (deck (org-anki--find-deck))
        (maybe-id (org-entry-get nil org-anki-prop-note-id)))
