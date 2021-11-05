@@ -177,7 +177,9 @@ and NEW-FRONT and NEW-BACK strings."
           (org-anki--note-back note)))))))
 
 (defun org-anki--tag-diff (current note)
-  ;; :: [Tag] -> [Tag] -> [Action]
+  "Calculate new tags that need to be added and tags that need to
+be removed from the Anki app, return actions that do that."
+  ;; :: [Tag] -> Note -> [Action]
   (let*
       ((new (org-anki--note-tags note))
        (remove (cl-set-difference current new :test #'equal))
@@ -325,12 +327,6 @@ question and answer are generated from it, and BACK is ignored."
      ((equal "updateNoteFields" (assoc-default "action" action))
       (message "org-anki: note succesfully updated: %s" (org-anki--note-maybe-id note))))))
 
-(defun org-anki--add-note-to-every-action (note-and-actions)
-  ;; :: (Note, [Action]) -> [(Note, Action)]
-  (let ((note (car note-and-actions))
-        (actions (car (cdr note-and-actions))))
-    (-map (lambda (action) (cons note action)) actions)))
-
 (defun org-anki--existing-tags (notes)
   ;; :: [Note] -> Promise (AList Id [Tag])
   (promise-new
@@ -344,6 +340,26 @@ question and answer are generated from it, and BACK is ignored."
                (promise-catch (lambda (reason) (funcall reject reason)))))
          (funcall resolve nil))))))
 
+(defun org-anki--execute-api-actions (note-action-pairs)
+  (let ((actions (--map (cdr it) note-action-pairs)))
+    (org-anki-connect-request
+     (org-anki--multi actions)
+     (lambda (the-result)
+       (let*
+           ((result-list (append the-result nil))
+            (pairs (-zip-lists note-action-pairs result-list))
+            (sorted
+             (-sort
+              (lambda (a b)
+                (> (org-anki--get-point a) (org-anki--get-point b)))
+              pairs))
+            )
+         (-map 'org-anki--handle-pair sorted)))
+     (lambda (the-error)
+       (org-anki--report-error
+        "Couldn't update note, received: %s"
+        the-error)))))
+
 (defun org-anki--sync-notes (notes)
   ;; :: [Note] -> IO ()
   "Syncronize NOTES."
@@ -352,59 +368,65 @@ question and answer are generated from it, and BACK is ignored."
       (promise-chain
           (org-anki--existing-tags notes)
         (then
-         (lambda (existing-tags)
+         (lambda (all-existing-tags)
            (let*
-               ((notes-and-actions
+               (
+                ;; Calculate added and updated notes
+                (new-and-existing
                  (-partition
                   (lambda (note)
                     (cond
-                     ((org-anki--note-maybe-id note)
-                      (cons
-                       :right
-                       (cons note (org-anki--update-note-single note))))
-                     (t
-                      (cons
-                       :left
-                       (cons note (org-anki--create-note-single note))))))
+                     ((org-anki--note-maybe-id note) (cons :right note))
+                     (t                              (cons :left note))))
                   notes))
-                (adds (car notes-and-actions)) ;; [(Note, Action)]
-                (updates (cdr notes-and-actions)) ;; [(Note, Action)]
+                (new (car new-and-existing))      ;; [Note]
+                (existing (cdr new-and-existing)) ;; [Note]
+                (additions (--map (cons it (org-anki--create-note-single it)) new))      ;; [(Note, Action)]
+                (updates   (--map (cons it (org-anki--update-note-single it)) existing)) ;; [(Note, Action)]
+
+                ;; Calculate added and removed tags
                 (notes-and-tag-actions ;; [(Note, [Action])]
                  (-map
                   (lambda (note-and-action)
                     (let* ((note (car note-and-action))
-                           (existing
-                            (cdr (assq (org-anki--note-maybe-id note) existing-tags))))
-                      (cons note (org-anki--tag-diff existing note))))
+                           (existing-tags
+                            (cdr (assq (org-anki--note-maybe-id note) all-existing-tags))))
+                      (cons note (org-anki--tag-diff existing-tags note))))
                   updates))
                 (notes-and-tag-actions2 ;; [(Note, Action)]
-                 (-mapcat
-                  (lambda (pair)
-                    (let ((note (car pair))
-                          (actions (cdr pair))
-                          )
-                      (--map (cons note it) actions)
-                      )) notes-and-tag-actions))
-                (note-action-pairs (-concat adds updates notes-and-tag-actions2))
-                (actions (--map (cdr it) note-action-pairs)))
+                 (--mapcat
+                  (let ((note (car it))
+                        (actions (cdr it)))
+                    (--map (cons note it) actions))
+                  notes-and-tag-actions)))
 
-             (org-anki-connect-request
-              (org-anki--multi actions)
-              (lambda (the-result)
-                (let*
-                    ((result-list (append the-result nil))
-                     (pairs (-zip-lists note-action-pairs result-list))
-                     (sorted
-                      (-sort
-                       (lambda (a b)
-                         (> (org-anki--get-point a) (org-anki--get-point b)))
-                       pairs))
-                     )
-                  (-map 'org-anki--handle-pair sorted)))
-              (lambda (the-error)
-                (org-anki--report-error
-                 "Couldn't update note, received: %s"
-                 the-error))))))
+             (if (and (= (length updates) 1) (= (length notes) 1))
+
+                 ;; If there there is only one update, then don't use
+                 ;; multi for that:
+                 (let* ((pair (car updates))
+                        (note (car pair))
+                        (action (cdr pair)))
+
+                   (message "one update" action)
+                   (org-anki-connect-request
+                    action
+                    (lambda (the-result)
+                      (message
+                       "org-anki: note succesfully updated: %s"
+                       (org-anki--note-maybe-id note)))
+                    (lambda (the-error)
+                      (org-anki--report-error
+                       "Couldn't update note, received: %s"
+                       the-error)))
+
+                   ;; Update tags (if any) for the single note, too:
+                   (if notes-and-tag-actions2
+                       (org-anki--execute-api-actions notes-and-tag-actions2)))
+
+               ;; It's not just one updated note, default to multi
+               (let ((note-action-pairs (-concat additions updates notes-and-tag-actions2))) ;; [(Note, Action)]
+                 (org-anki--execute-api-actions note-action-pairs))))))
         (promise-catch (lambda (reason) (error reason))))))
 
 (defun org-anki--delete-notes_ (notes)
