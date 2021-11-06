@@ -19,6 +19,8 @@ after being synced to Anki.
 ** Commands
 - =org-anki-sync-entry= :: adds or updates the current org-entry under
      cursor.
+- =org-anki-update-all= :: updates all entries in buffer. "All" means
+  all entries that have ANKI_NOTE_ID property set.
 - =org-anki-sync-all= :: adds or updates all entries in buffer.
   Use #+ANKI_MATCH: some_property="some value" at top-of-file to
   selectively sync matched entries. Syntax is same as the [[https://orgmode.org/manual/Using-the-Mapping-API.html][MATCH argument for org-map-entries]].

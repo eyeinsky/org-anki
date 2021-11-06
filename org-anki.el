@@ -467,6 +467,17 @@ question and answer are generated from it, and BACK is ignored."
      (org-map-entries 'org-anki--note-at-point (org-anki--get-match)))))
 
 ;;;###autoload
+(defun org-anki-update-all (&optional buffer)
+  ;; :: Maybe Buffer -> IO ()
+  "Updates all entries in optional BUFFER.
+
+Updates all entries that have ANKI_NOTE_ID property set."
+  (interactive)
+  (with-current-buffer (or buffer (buffer-name))
+    (org-anki--sync-notes
+     (org-map-entries 'org-anki--note-at-point "ANKI_NOTE_ID<>\"\""))))
+
+;;;###autoload
 (defun org-anki-delete-entry ()
   ;; :: IO ()
   "Delete org entry under cursor."
