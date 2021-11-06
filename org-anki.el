@@ -65,6 +65,15 @@ property"
   :type '(string)
   :group 'org-anki)
 
+(defcustom org-anki-model-fields
+  '(("Basic" "Front" "Back")
+    ("Basic (and reversed card)" "Front" "Back")
+    ("Basic (optional reversed card)" "Front" "Back")
+    ("Cloze" "Text"))
+  "Default fields for note types."
+  :type '(repeat (list (repeat string)))
+  :group 'org-anki)
+
 ;; Stolen code
 
 ;; Get list of global properties
@@ -211,22 +220,29 @@ be removed from the Anki app, return actions that do that."
             `(,(org-anki--add-tags (org-anki--note-maybe-id note) add))))))
 
 (defun org-anki--to-fields (note)
-  "Convert org item title FRONT and content BACK to json fields
-sent to AnkiConnect. If FRONT contains Cloze syntax then both the
-question and answer are generated from it, and BACK is ignored."
-  (let
+  "Convert NOTE to json fields sent to AnkiConnect.
+
+Note type is used to choose field names for the note.
+
+If title or content field contains Cloze syntax then that field
+is used for both the question and answer and the other field is
+ignored."
+  (let*
       ((front (org-anki--note-front note))
-       (back (org-anki--note-back note)))
-    (cond
-     ((org-anki--is-cloze front)
-      `(("modelName" . "Cloze")
-        ("fields" . (("Text" . ,front)))))
-     ((org-anki--is-cloze back)
-      `(("modelName" . "Cloze")
-        ("fields" . (("Text" . ,back)))))
-     (t
-      `(("modelName" . ,(org-anki--note-type note))
-        ("fields" . (("Front" . ,front) ("Back" . ,back))))))))
+       (back (org-anki--note-back note))
+       (model-name-and-field-values
+        (cond
+         ((org-anki--is-cloze front) `("Cloze" ,front))
+         ((org-anki--is-cloze back) `("Cloze" ,back))
+         (t `(,(org-anki--note-type note) ,front ,back))
+         ))
+       (model-name (car model-name-and-field-values))
+       (field-values (cdr model-name-and-field-values))
+       (field-names (cdr (assoc model-name org-anki-model-fields)))
+       (fields (-zip field-names field-values)))
+
+    `(("modelName" . ,model-name)
+      ("fields" . ,fields))))
 
 (defun org-anki--delete-notes (ids)
   "Create an `deleteNotes' json structure with integer IDS list."
@@ -478,7 +494,17 @@ question and answer are generated from it, and BACK is ignored."
             "org-anki-delete-all error: %s"
             the-error))))))
 
-;; Interactive commands
+;; Public API
+
+;;; Convenience functions
+
+(defun org-anki-add-model (model &rest field-names)
+  "Add MODEL with FIELD-NAMES."
+  (customize-set-variable
+   'org-anki-model-fields
+   (cons `(,model ,@field-names) org-anki-model-fields)))
+
+;;; Interactive commands
 
 ;;;###autoload
 (defun org-anki-sync-entry ()
