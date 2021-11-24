@@ -74,6 +74,12 @@ property"
   :type '(repeat (list (repeat string)))
   :group 'org-anki)
 
+(defcustom org-anki-css-stylesheet nil
+  "The CSS stylesheet to use; if set to `nil’, the default Anki
+stylesheet will be used."
+  :type '(string)
+  :group 'org-anki)          
+
 ;; Stolen code
 
 ;; Get list of global properties
@@ -281,8 +287,16 @@ ignored."
       )))
 
 (defun org-anki--string-to-html (string)
-  "Convert STRING (org element heading or content) to html."
-  (save-excursion (org-export-string-as string 'html t '(:with-toc nil))))
+  "Convert STRING (org element heading or content) to html, and
+insert `org-anki-css-stylesheet'."
+  (save-excursion
+    (format "\
+<style>
+%s
+</style>
+%s
+" org-anki-css-stylesheet
+(org-export-string-as string 'html t '(:with-toc nil)))))
 
 (defun org-anki--report-error (format error)
   "FORMAT the ERROR and prefix it with `org-anki error'."
