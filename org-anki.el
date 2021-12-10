@@ -562,5 +562,28 @@ syntax."
       (org-anki-cloze (car bounds) (cdr bounds) arg hint)))
    (t (error "Nothing to create cloze from"))))
 
+;;;###autoload
+(defun org-anki-browse-entry ()
+  "Browse entry at point on anki's browser dialog with searching nid"
+  (interactive)
+  (let ((maybe-id (org-entry-get nil org-anki-prop-note-id)))
+    (cond
+     ((stringp maybe-id)
+      (org-anki-connect-request
+       (org-anki--body
+        "guiBrowse"
+        `(("query" . ,(concat "nid:" maybe-id))))
+       (lambda (the-result)
+         (message "org-anki: send request succesfully, please switch to anki"))
+       (lambda (the-error)
+         (message "org-anki: send request succesfully, please switch to anki")
+         ;; due to issues:https://github.com/FooSoft/anki-connect/issues/277
+         ;; ignore error until it fixed
+         ;; (org-anki--report-error
+         ;;  "Couldn't find note, received: %s"
+         ;;  the-error)
+         )))
+     (t (message "org-anki: no note id here")))))
+
 (provide 'org-anki)
 ;;; org-anki.el ends here
