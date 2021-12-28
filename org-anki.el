@@ -338,7 +338,7 @@ ignored."
 
 ;; Helpers
 
-(defun -partition (fn list)
+(defun org-anki--partition (fn list)
   (seq-reduce
    (lambda (acc e)
      (let*
@@ -419,7 +419,7 @@ ignored."
                (
                 ;; Calculate added and updated notes
                 (new-and-existing
-                 (-partition
+                 (org-anki--partition
                   (lambda (note)
                     (cond
                      ((org-anki--note-maybe-id note) (cons :right note))
