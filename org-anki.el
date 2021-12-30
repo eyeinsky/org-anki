@@ -321,7 +321,7 @@ ignored."
 (defun org-anki--is-cloze (text)
   "Check if TEXT has cloze syntax, return nil if not."
   ;; Check for something similar to {{c1::Hidden-text::Hint}} in TEXT
-  (if (string-match "{{c[0-9]+::\\([^:\}]*\\)::\\([^:\}]*\\)}}" text)
+  (if (string-match "{{c[0-9]+::\\(\n\\|.\\)*}}" text)
       "Cloze"
     nil))
 
