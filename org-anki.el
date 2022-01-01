@@ -577,11 +577,9 @@ syntax."
          (message "org-anki: send request succesfully, please switch to anki"))
        (lambda (the-error)
          (message "org-anki: send request succesfully, please switch to anki")
-         ;; due to issues:https://github.com/FooSoft/anki-connect/issues/277
-         ;; ignore error until it fixed
-         ;; (org-anki--report-error
-         ;;  "Couldn't find note, received: %s"
-         ;;  the-error)
+         (org-anki--report-error
+          "Browse error, received: %s"
+          the-error)
          )))
      (t (message "org-anki: no note id here")))))
 
