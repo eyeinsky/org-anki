@@ -576,7 +576,6 @@ syntax."
        (lambda (the-result)
          (message "org-anki: send request succesfully, please switch to anki"))
        (lambda (the-error)
-         (message "org-anki: send request succesfully, please switch to anki")
          (org-anki--report-error
           "Browse error, received: %s"
           the-error)
