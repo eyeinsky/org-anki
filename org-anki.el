@@ -65,6 +65,11 @@ property"
   :type '(string)
   :group 'org-anki)
 
+(defcustom org-anki-ankiconnnect-request-address "http://127.0.0.1:8765"
+  "The address of AnkiConnect"
+  :type '(string)
+  :group 'org-anki)
+
 (defcustom org-anki-model-fields
   '(("Basic" "Front" "Back")
     ("Basic (and reversed card)" "Front" "Back")
@@ -98,13 +103,13 @@ Default NAME is \"PROPERTY\", default BUFFER the current buffer."
 ;; AnkiConnect API
 
 (defun org-anki-connect-request (body on-result on-error)
-  "Perform HTTP GET request to AnkiConnect's default http://localhost:8765.
+  "Perform HTTP GET request to AnkiConnect's address, which configuare by org-anki-ankiconnnect-request-address
 
 BODY is the alist json payload, CALLBACK the function to call
 with result."
   (let ((json (json-encode `(("version" . 6) ,@body))))
     (request
-      "http://localhost:8765" ; This is where AnkiConnect add-on listens.
+      org-anki-ankiconnnect-request-address ; This is where AnkiConnect add-on listens.
       :type "GET"
       :data json
       :headers '(("Content-Type" . "application/json"))
