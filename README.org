@@ -31,9 +31,11 @@ after being synced to Anki.
 - =org-anki-cloze-dwim= :: converts a region or word under cursor to
   Cloze syntax, i.e ={{c1::hidden text::hint text}}=. This should be
   used in org entry's title.
+- =org-anki-browse-entry= :: Browse entry at point on anki's browser dialog with searching nid
 
 ** Setup
 - Start Anki with AnkiConnect installed
+- Set address that AnkiConnect add-on listened if you changed configuration in Anki by =(customize-set-variable 'org-anki-ankiconnect-request-address "http://hostname:port")=, default is =http://127.0.0.1:8765=
 - Set destination deck name, either as:
   - =(customize-set-variable 'org-anki-default-deck "my-target-deck")= in
     your .emacs
