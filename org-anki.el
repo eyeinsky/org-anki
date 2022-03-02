@@ -69,7 +69,7 @@ property"
   '(("Basic" "Front" "Back")
     ("Basic (and reversed card)" "Front" "Back")
     ("Basic (optional reversed card)" "Front" "Back")
-    ("Cloze" "Text"))
+    ("Cloze" "Text" "Extra"))
   "Default fields for note types."
   :type '(repeat (list (repeat string)))
   :group 'org-anki)
@@ -232,8 +232,8 @@ ignored."
        (back (org-anki--note-back note))
        (model-name-and-field-values
         (cond
-         ((org-anki--is-cloze front) `("Cloze" ,front))
-         ((org-anki--is-cloze back) `("Cloze" ,back))
+         ((org-anki--is-cloze front) `("Cloze" ,front ,back))
+         ((org-anki--is-cloze back) `("Cloze" ,back ,front))
          (t `(,(org-anki--note-type note) ,front ,back))
          ))
        (model-name (car model-name-and-field-values))
