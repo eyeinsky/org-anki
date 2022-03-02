@@ -1,3 +1,5 @@
+* v0.0.9
+- make AnkiConnect listen address configurable (customizable)
 * v0.0.8
 - With Cloze notes use either the title or the content as value for
   =Extra= field
