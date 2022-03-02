@@ -1,6 +1,13 @@
 * v0.0.8
 - With Cloze notes use either the title or the content as value for
   =Extra= field
+* v0.0.7
+- add customizable note fields
+- add customizable default note type
+- support mathjax
+- add command =org-anki-update-all= to update all notes in current
+  buffer (but don't create any new cards)
+- make =ANKI_DECK= inheritable
 * v0.0.6
 - add commands =org-anki-sync-all= and =org-anki-delete-all=
 - optimize HTTP requests by
