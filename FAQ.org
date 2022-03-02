@@ -1,0 +1,15 @@
+* Can I add raw HTML to notes?
+
+Yes.
+
+org-anki uses org-mode's export mechanism to convert org syntax to
+HTML so you can quote the raw HTML as described [[https://orgmode.org/manual/Quoting-HTML-tags.html][here]].
+* Can I add custom CSS for my notes?
+
+Yes.
+
+For global styling do it directly via one of the apps. E.g on Linux this
+is: "Tools" -> "Manage Note Types" -> select note type -> "Cards.." ->
+add wanted css to Styling section.
+
+For a single card use the [[https://orgmode.org/manual/Quoting-HTML-tags.html][raw HTML syntax]] to add <style> ... </style>.
