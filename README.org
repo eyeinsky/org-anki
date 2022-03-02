@@ -31,6 +31,7 @@ after being synced to Anki.
 - =org-anki-cloze-dwim= :: converts a region or word under cursor to
   Cloze syntax, i.e ={{c1::hidden text::hint text}}=. This should be
   used in org entry's title.
+- =org-anki-browse-entry= :: Browse entry at point on anki's browser dialog with searching nid
 
 ** Setup
 - Start Anki with AnkiConnect installed
@@ -42,10 +43,13 @@ after being synced to Anki.
   - Note that deck mentioned in the above ways must pre-exist (it has
     to be separately created in the Anki app)
 - Run =anki-sync-entry= to sync org entry under cursor
-- Run =org-anki-delete-entry= to delete entry under cursor
 
-Note: the card browser must be closed while synchronizing, as it won't
-update the note otherwise ([[https://github.com/FooSoft/anki-connect/issues/82][issue]]).
+  Note: the card browser must be closed while synchronizing, as it
+  won't update the note otherwise ([[https://github.com/FooSoft/anki-connect/issues/82][issue]]).
+- Run =org-anki-delete-entry= to delete entry under cursor
+- Optionally configure =org-anki-ankiconnnect-listen-address= if
+  AnkiConnect doesn't listen on the default address
+  (=http://127.0.0.1:8765=)
 
 You probably want to bind =org-anki-sync-entry= to a key sequence, but not
 =org-anki-delete-entry= -- as accidentally deleting notes will become too
