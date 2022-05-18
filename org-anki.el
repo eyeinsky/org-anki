@@ -3,7 +3,7 @@
 ;; Copyright (C) 2021 Markus Läll
 ;;
 ;; URL: https://github.com/eyeinsky/org-anki
-;; Version: 0.0.9
+;; Version: 0.0.10
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
 ;; Package-Requires: ((emacs "27.1") (request "0.3.2") (dash "2.17") (promise "1.1"))
@@ -295,6 +295,8 @@ ignored."
   (let ((fmt0 (concat "org-anki error: " format)))
     (message fmt0 error)))
 
+(defun org-anki--no-action () (message "No action taken."))
+
 (defun org-anki--find-prop (name default)
   "Find property with NAME from
 1. item,
@@ -544,15 +546,22 @@ Updates all entries that have ANKI_NOTE_ID property set."
   ;; :: IO ()
   "Delete org entry under cursor."
   (interactive)
-  (org-anki--delete-notes_ (cons (org-anki--note-at-point) nil)))
+  (let ((msg (format "Delete note '%s'?" (org-entry-get nil "ITEM"))))
+    (if (y-or-n-p msg)
+        (org-anki--delete-notes_ (cons (org-anki--note-at-point) nil))
+      (org-anki--no-action))))
 
 (defun org-anki-delete-all (&optional buffer)
   "Delete all entries in BUFFER, use current buffer if not specified."
   ;; :: Maybe Buffer -> IO ()
   (interactive)
-  (with-current-buffer (or buffer (buffer-name))
-    (org-anki--delete-notes_
-     (org-map-entries 'org-anki--note-at-point "ANKI_NOTE_ID<>\"\""))))
+  (let* ((buffer-name_ (or buffer (buffer-name)))
+         (prompt (format "Are you sure you want to delete all notes in buffer '%s' from Anki?" buffer-name_)))
+    (if (y-or-n-p prompt)
+        (with-current-buffer buffer-name_
+          (org-anki--delete-notes_
+           (org-map-entries 'org-anki--note-at-point "ANKI_NOTE_ID<>\"\"")))
+      (org-anki--no-action))))
 
 ;; Stolen from https://github.com/louietan/anki-editor
 ;;;###autoload
