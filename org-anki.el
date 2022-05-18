@@ -1,6 +1,6 @@
 ;;; org-anki.el --- Synchronize org-mode entries to Anki -*- lexical-binding: t -*-
 ;;
-;; Copyright (C) 2021 Markus Läll
+;; Copyright (C) 2022 Markus Läll
 ;;
 ;; URL: https://github.com/eyeinsky/org-anki
 ;; Version: 0.0.10
