@@ -3,6 +3,9 @@ Non-invasive minor mode to synchronize your org-mode notes to Anki.
 
 Works via [[https://foosoft.net/projects/anki-connect/][AnkiConnect]] add-on to [[https://apps.ankiweb.net/][Anki]].[fn:via]
 
+Features deck import via =org-anki-import-deck= (requires pandoc for
+converting html to org).
+
 ** How
 Creates "Basic" or "Cloze" type notes.
 
@@ -32,6 +35,8 @@ after being synced to Anki.
   Cloze syntax, i.e ={{c1::hidden text::hint text}}=. This should be
   used in org entry's title.
 - =org-anki-browse-entry= :: Browse entry at point on anki's browser dialog with searching nid
+- =org-anki-import-deck= :: Prompts for deck name and imports
+  it. Requires pandoc for converting html to org.
 
 ** Setup
 - Start Anki with AnkiConnect installed
