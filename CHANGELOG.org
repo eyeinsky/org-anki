@@ -1,3 +1,8 @@
+* v0.0.11
+- add =org-anki-import-deck= command
+* v0.0.10
+- add prompt to =org-anki-delete-entry= and =org-anki-delete-all=
+  commands (wouldn't want to delete anything accidentally!)
 * v0.0.9
 - make AnkiConnect listen address configurable (customizable)
 * v0.0.8
