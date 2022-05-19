@@ -602,7 +602,9 @@ syntax."
 (defun org-anki-import-deck (name &optional buffer)
   "Import deck with NAME to current buffer, or to BUFFER when provided.
 
-This is a best-effort command which doesn't support all of Anki's features. Its use case is to import a deck to an .org which from then on will be used as source-of-truth for the notes."
+This is a best-effort command which doesn't support all of Anki's features. Its use case is to import a deck to an .org which from then on will be used as source-of-truth for the notes.
+
+Pandoc is required to be installed."
 
   (interactive "sDeck name: ")
   (org-anki-connect-request
@@ -646,12 +648,21 @@ This is a best-effort command which doesn't support all of Anki's features. Its 
 
     (make-org-anki--note
      :maybe-id (field 'noteId)
-     :front    (car front-back)
-     :back     (cdr front-back)
+     :front    (org-anki--html-to-org (car front-back))
+     :back     (org-anki--html-to-org (cdr front-back))
      :tags     (append (field 'tags) nil)
      ;; :deck     deck
      :type     type
      :point    nil))))
+
+
+(defun org-anki--html-to-org (html)
+  (if html
+      (replace-regexp-in-string
+       "\n+$" ""
+       (shell-command-to-string
+        (format "pandoc --wrap=none --from=html --to=org <<< '%s'" html)))
+    ""))
 
 (defun org-anki--write-note (note)
   ;; Add title
