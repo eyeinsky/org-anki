@@ -575,7 +575,7 @@ syntax."
     (org-anki--region-to-cloze (region-beginning) (region-end) arg hint))
    ((thing-at-point 'word)
     (let ((bounds (bounds-of-thing-at-point 'word)))
-      (org-anki-cloze (car bounds) (cdr bounds) arg hint)))
+      (org-anki--region-to-cloze (car bounds) (cdr bounds) arg hint)))
    (t (error "Nothing to create cloze from"))))
 
 ;;;###autoload
