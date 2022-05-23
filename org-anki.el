@@ -3,7 +3,7 @@
 ;; Copyright (C) 2022 Markus Läll
 ;;
 ;; URL: https://github.com/eyeinsky/org-anki
-;; Version: 0.0.12
+;; Version: 1.0.0
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
 ;; Package-Requires: ((emacs "27.1") (request "0.3.2") (dash "2.17") (promise "1.1"))
@@ -46,6 +46,7 @@
 (defconst org-anki-prop-deck "ANKI_DECK")
 (defconst org-anki-match "ANKI_MATCH")
 (defconst org-anki-note-type "ANKI_NOTE_TYPE")
+(defconst org-anki-prop-global-tags "ANKI_TAGS")
 
 ;; Customizable variables
 
@@ -78,6 +79,11 @@ property"
     ("Cloze" "Text"))
   "Default fields for note types."
   :type '(repeat (list (repeat string)))
+  :group 'org-anki)
+
+(defcustom org-anki-inherit-tags t
+  "Inherit tags, set to nil to turn off."
+  :type 'boolean
   :group 'org-anki)
 
 ;; Stolen code
@@ -320,10 +326,14 @@ ignored."
     (if (stringp file-global) file-global org-anki-default-match)))
 
 (defun org-anki--get-tags ()
-  (let ((tags (org-entry-get nil "TAGS")))
-    (cond
-     (tags (split-string tags ":" t))
-     (t nil))))
+  (delete-dups
+   (split-string
+    (let ((global-tags (org-anki--get-global-prop org-anki-prop-global-tags)))
+      (concat
+       (if org-anki-inherit-tags
+           (substring-no-properties (org-entry-get nil "ALLTAGS"))
+         (org-entry-get nil "TAGS"))
+       global-tags)) ":" t)))
 
 ;;; Cloze
 
