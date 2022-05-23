@@ -3,7 +3,7 @@
 ;; Copyright (C) 2022 Markus Läll
 ;;
 ;; URL: https://github.com/eyeinsky/org-anki
-;; Version: 1.0.0
+;; Version: 1.0.1
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
 ;; Package-Requires: ((emacs "27.1") (request "0.3.2") (dash "2.17") (promise "1.1"))
@@ -331,7 +331,7 @@ ignored."
     (let ((global-tags (org-anki--get-global-prop org-anki-prop-global-tags)))
       (concat
        (if org-anki-inherit-tags
-           (substring-no-properties (org-entry-get nil "ALLTAGS"))
+           (substring-no-properties (or (org-entry-get nil "ALLTAGS") ""))
          (org-entry-get nil "TAGS"))
        global-tags)) ":" t)))
 
