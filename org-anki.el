@@ -3,7 +3,7 @@
 ;; Copyright (C) 2022 Markus Läll
 ;;
 ;; URL: https://github.com/eyeinsky/org-anki
-;; Version: 1.0.1
+;; Version: 1.0.2
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
 ;; Package-Requires: ((emacs "27.1") (request "0.3.2") (dash "2.17") (promise "1.1"))
@@ -289,9 +289,8 @@ ignored."
     (re-search-forward ":properties:\\(.*\n\\)*:end:" (org-entry-end-position) t)
     ;; Get entry content
     (let ((from (point))
-          (to (progn (outline-next-visible-heading 1) (point))))
-      (buffer-substring-no-properties from to)
-      )))
+          (to (progn (outline-next-heading) (point))))
+      (buffer-substring-no-properties from to))))
 
 (defun org-anki--string-to-html (string)
   "Convert STRING (org element heading or content) to html."
