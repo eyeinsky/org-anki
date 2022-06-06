@@ -732,5 +732,15 @@ Pandoc is required to be installed."
           (insert content)
           (insert "\n")))))
 
+(defun org-anki-copy-images ()
+  ;; todo: filter non images (or at least non files)
+  ;; todo: make image names unique?
+  (interactive)
+  (->> (org-ml-parse-this-subtree)
+	   (org-ml-match '(:any * link))
+	   (--map (org-ml-get-property :path it))
+	   (--remove (string-prefix-p org-anki-media-dir it))
+	   (--map (copy-file it org-anki-media-dir t))))
+
 (provide 'org-anki)
 ;;; org-anki.el ends here
