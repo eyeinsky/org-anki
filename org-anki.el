@@ -302,7 +302,9 @@ ignored."
 
 (defun org-anki--string-to-html (string)
   "Convert STRING (org element heading or content) to html."
-  (save-excursion (org-export-string-as string 'html t '(:with-toc nil))))
+  (save-excursion (org-export-string-as
+				   (org-anki--edit-links 'org-anki--remove-prefix string)
+				   'html t '(:with-toc nil))))
 
 (defun org-anki--report-error (format error)
   "FORMAT the ERROR and prefix it with `org-anki error'."
@@ -675,7 +677,7 @@ Pandoc is required to be installed."
 
 (defun org-anki--html-to-org (html)
   (if html
-	  (add-link-prefix
+	  (org-anki--edit-links 'org-anki--add-prefix
        (replace-regexp-in-string
 		"\n+$" ""
 		(shell-command-to-string
@@ -683,16 +685,23 @@ Pandoc is required to be installed."
     ""))
 
 
-(defun add-link-prefix (org-string)
+(defun org-anki--add-prefix(node)
+  (let* ((path (org-ml-get-property :path node))
+		 (new-path (concat anki-org--media-path path))) ;; fix this
+	(org-ml-set-property :path new-path node)))
+
+(defun org-anki--remove-prefix(node)
+  (let* ((path (org-ml-get-property :path node))
+				  (new-path (string-remove-prefix anki-org--media path))) ;; fix this
+			 (org-ml-set-property :path new-path node)))
+
+(defun org-anki--edit-links (func org-string)
   (->> (org-ml--from-string org-string)
-	   (org-ml-match-map '(:any * (:and link))
-		 (lambda (node)
-		   (let* ((path (org-ml-get-property :path node))
-				  (new-path (concat anki-org--media-path path))) ;; fix this
-			 (org-ml-set-property :path new-path node))))
+	   (org-ml-match-map '(:any * (:and link)) func)
 	   (org-ml-to-string)))
 
-(setq anki-org--media-path "~/anki2-docker-2.1.40/User 1/collection.media/")
+
+(setq org-anki--media-path "~/anki2-docker-2.1.40/User 1/collection.media/")
 
 
 (defun org-anki--write-note (note)
