@@ -688,9 +688,7 @@ Pandoc is required to be installed."
 
 (defun org-anki--remove-media-prefix(node)
   (let* ((path (org-ml-get-property :path node))
-		 (new-path (string-remove-prefix
-					(concat (directory-file-name org-anki-media-dir) "/")
-					path)))
+		 (new-path (file-name-nondirectory path)))
 			 (org-ml-set-property :path new-path node)))
 
 
