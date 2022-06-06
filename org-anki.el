@@ -696,7 +696,7 @@ Pandoc is required to be installed."
 
 (defun org-anki--edit-links (func org-string)
   (->> (org-ml--from-string org-string)
-	   (org-ml-match-map '(:any * (:and link)) func)
+	   (org-ml-match-map '(:any * link) func)
 	   (org-ml-to-string)))
 
 
