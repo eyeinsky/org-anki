@@ -94,6 +94,11 @@ how to use it to include or skip an entry from being synced."
   :type '(function)
   :group 'org-anki)
 
+(defcustom org-anki-media-path nil
+  "Path to Anki's media collection, set to nil to turn off copying media."
+  :type '(string)
+  :group 'org-anki)
+
 ;; Stolen code
 
 ;; Get list of global properties
