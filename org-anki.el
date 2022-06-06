@@ -308,7 +308,7 @@ ignored."
 (defun org-anki--string-to-html (string)
   "Convert STRING (org element heading or content) to html."
   (save-excursion (org-export-string-as
-				   (org-anki--edit-links 'org-anki--remove-prefix string)
+				   (org-anki--edit-links 'org-anki--remove-media-prefix string)
 				   'html t '(:with-toc nil))))
 
 (defun org-anki--report-error (format error)
@@ -680,15 +680,17 @@ Pandoc is required to be installed."
      :point    nil))))
 
 
-(defun org-anki--add-prefix(node)
+(defun org-anki--add-media-prefix(node)
   (let* ((path (org-ml-get-property :path node))
-		 (new-path (concat org-anki--media-path path))) ;; fix this
+		 (new-path (expand-file-name path org-anki-media-dir)))
 	(org-ml-set-property :path new-path node)))
 
 
-(defun org-anki--remove-prefix(node)
+(defun org-anki--remove-media-prefix(node)
   (let* ((path (org-ml-get-property :path node))
-				  (new-path (string-remove-prefix org-anki--media-path path))) ;; fix this
+		 (new-path (string-remove-prefix
+					(concat (directory-file-name org-anki-media-dir) "/")
+					path)))
 			 (org-ml-set-property :path new-path node)))
 
 
@@ -700,7 +702,7 @@ Pandoc is required to be installed."
 
 (defun org-anki--html-to-org (html)
   (if html
-	  (org-anki--edit-links 'org-anki--add-prefix
+	  (org-anki--edit-links 'org-anki--add-media-prefix
        (replace-regexp-in-string
 		"\n+$" ""
 		(shell-command-to-string
