@@ -675,6 +675,24 @@ Pandoc is required to be installed."
      :point    nil))))
 
 
+(defun org-anki--add-prefix(node)
+  (let* ((path (org-ml-get-property :path node))
+		 (new-path (concat org-anki--media-path path))) ;; fix this
+	(org-ml-set-property :path new-path node)))
+
+
+(defun org-anki--remove-prefix(node)
+  (let* ((path (org-ml-get-property :path node))
+				  (new-path (string-remove-prefix org-anki--media-path path))) ;; fix this
+			 (org-ml-set-property :path new-path node)))
+
+
+(defun org-anki--edit-links (func org-string)
+  (->> (org-ml--from-string org-string)
+	   (org-ml-match-map '(:any * (:and link)) func)
+	   (org-ml-to-string)))
+
+
 (defun org-anki--html-to-org (html)
   (if html
 	  (org-anki--edit-links 'org-anki--add-prefix
@@ -683,25 +701,6 @@ Pandoc is required to be installed."
 		(shell-command-to-string
          (format "pandoc --wrap=none --from=html --to=org <<< %s" (shell-quote-argument html)))))
     ""))
-
-
-(defun org-anki--add-prefix(node)
-  (let* ((path (org-ml-get-property :path node))
-		 (new-path (concat anki-org--media-path path))) ;; fix this
-	(org-ml-set-property :path new-path node)))
-
-(defun org-anki--remove-prefix(node)
-  (let* ((path (org-ml-get-property :path node))
-				  (new-path (string-remove-prefix anki-org--media path))) ;; fix this
-			 (org-ml-set-property :path new-path node)))
-
-(defun org-anki--edit-links (func org-string)
-  (->> (org-ml--from-string org-string)
-	   (org-ml-match-map '(:any * (:and link)) func)
-	   (org-ml-to-string)))
-
-
-(setq org-anki--media-path "~/anki2-docker-2.1.40/User 1/collection.media/")
 
 
 (defun org-anki--write-note (note)
