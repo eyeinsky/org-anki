@@ -86,7 +86,7 @@ property"
   :type 'boolean
   :group 'org-anki)
 
-(defcustom org-anki-skip-funktion nil
+(defcustom org-anki-skip-function nil
   "Function used to skip tags.
 Should behave like org-agenda-skip-function."
   :type '(function)
