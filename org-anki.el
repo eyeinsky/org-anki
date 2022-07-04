@@ -87,8 +87,9 @@ property"
   :group 'org-anki)
 
 (defcustom org-anki-skip-function nil
-  "Function used to skip tags.
-Should behave like org-agenda-skip-function."
+  "Function used to skip entries.
+Given as the SKIP argument to org-map-entries, see its help for
+how to use it to include or skip an entry for being synced."
   :type '(function)
   :group 'org-anki)
 
