@@ -3,7 +3,7 @@
 ;; Copyright (C) 2022 Markus Läll
 ;;
 ;; URL: https://github.com/eyeinsky/org-anki
-;; Version: 1.0.2
+;; Version: 1.0.3
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
 ;; Package-Requires: ((emacs "27.1") (request "0.3.2") (dash "2.17") (promise "1.1"))
@@ -84,6 +84,13 @@ property"
 (defcustom org-anki-inherit-tags t
   "Inherit tags, set to nil to turn off."
   :type 'boolean
+  :group 'org-anki)
+
+(defcustom org-anki-skip-function nil
+  "Function used to skip entries.
+Given as the SKIP argument to org-map-entries, see its help for
+how to use it to include or skip an entry from being synced."
+  :type '(function)
   :group 'org-anki)
 
 ;; Stolen code
@@ -538,7 +545,7 @@ ignored."
   (interactive)
   (with-current-buffer (or buffer (buffer-name))
     (org-anki--sync-notes
-     (org-map-entries 'org-anki--note-at-point (org-anki--get-match)))))
+     (org-map-entries 'org-anki--note-at-point (org-anki--get-match) nil 'org-anki-skip-function))))
 
 ;;;###autoload
 (defun org-anki-update-all (&optional buffer)
