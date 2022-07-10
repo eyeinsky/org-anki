@@ -1,3 +1,6 @@
+* v1.0.3
+- add customizable =org-anki-skip-function= to include/skip entries
+  when using =org-anki-sync-all=
 * v1.0.0
 - inherit tags from parent org entries and from file-global ANKI_TAGS
 - add customizable =org-anki-inherit-tags= to turn inheritance off
