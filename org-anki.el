@@ -3,7 +3,7 @@
 ;; Copyright (C) 2022 Markus Läll
 ;;
 ;; URL: https://github.com/eyeinsky/org-anki
-;; Version: 1.0.3
+;; Version: 1.0.4
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
 ;; Package-Requires: ((emacs "27.1") (request "0.3.2") (dash "2.17") (promise "1.1"))
@@ -677,7 +677,7 @@ Pandoc is required to be installed."
       (replace-regexp-in-string
        "\n+$" ""
        (shell-command-to-string
-        (format "pandoc --wrap=none --from=html --to=org <<< '%s'" html)))
+        (format "pandoc --wrap=none --from=html --to=org <<< %s" (shell-quote-argument html))))
     ""))
 
 (defun org-anki--write-note (note)
