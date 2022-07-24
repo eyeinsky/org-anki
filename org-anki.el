@@ -680,6 +680,36 @@ Pandoc is required to be installed."
         (format "pandoc --wrap=none --from=html --to=org <<< %s" (shell-quote-argument html))))
     ""))
 
+(defun bla (html)
+  (if html
+      (replace-regexp-in-string
+       "\n+$" ""
+       (let*
+           (
+            (p (make-process
+                 :name "pandoc"
+                 :command '("pandoc" "--wrap=none" "--from=html" "--to=org")
+                 :buffer "pandoc-stdout"
+                 :stderr "pandoc-stderr"
+                 )
+                )
+            ;; (p_ (start-process
+            ;;      nil
+            ;;      "tmp"
+            ;;      "pandoc" "--wrap=none" "--from=html" "--to=org"))
+            )
+         (message "process name is %s" p)
+         (process-send-string p html)
+         (message "sent html")
+         (process-send-string p "\n")
+         (message "sent empty string")
+         (process-send-eof p)
+         (message "sent eof")
+         "hello"
+        )
+       )
+    ""))
+
 (defun org-anki--write-note (note)
   ;; Add title
   (insert "* ")
