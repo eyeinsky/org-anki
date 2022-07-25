@@ -680,35 +680,33 @@ Pandoc is required to be installed."
         (format "pandoc --wrap=none --from=html --to=org <<< %s" (shell-quote-argument html))))
     ""))
 
-(defun bla (html)
-  (if html
-      (replace-regexp-in-string
-       "\n+$" ""
-       (let*
-           (
-            (p (make-process
-                 :name "pandoc"
-                 :command '("pandoc" "--wrap=none" "--from=html" "--to=org")
-                 :buffer "pandoc-stdout"
-                 :stderr "pandoc-stderr"
-                 )
-                )
-            ;; (p_ (start-process
-            ;;      nil
-            ;;      "tmp"
-            ;;      "pandoc" "--wrap=none" "--from=html" "--to=org"))
+(defun org-anki--html-to-org-promise (html)
+  (promise-new
+   (lambda (resolve _reject)
+     (if html
+         (replace-regexp-in-string
+          "\n+$" ""
+          (let ((p
+                 (make-process
+                  :name "pandoc"
+                  :command '("pandoc" "--wrap=none" "--from=html" "--to=org")
+                  :buffer "pandoc-stdout"
+                  :stderr "pandoc-stderr"
+                  :sentinel
+                  (lambda (_process event)
+                    (if (string= event "finished\n")
+                        (with-current-buffer "pandoc-stdout"
+                          (let ((str (buffer-substring-no-properties
+                                      (point-min)
+                                      (point-max))))
+                            (erase-buffer)
+                            (funcall resolve str))))))))
+            (process-send-string p html)
+            (process-send-string p "\n")
+            (process-send-eof p)
             )
-         (message "process name is %s" p)
-         (process-send-string p html)
-         (message "sent html")
-         (process-send-string p "\n")
-         (message "sent empty string")
-         (process-send-eof p)
-         (message "sent eof")
-         "hello"
-        )
-       )
-    ""))
+          "")))))
+
 
 (defun org-anki--write-note (note)
   ;; Add title
