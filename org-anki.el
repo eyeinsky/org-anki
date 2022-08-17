@@ -545,7 +545,7 @@ ignored."
   (interactive)
   (with-current-buffer (or buffer (buffer-name))
     (org-anki--sync-notes
-     (org-map-entries 'org-anki--note-at-point (org-anki--get-match) nil 'org-anki-skip-function))))
+     (org-map-entries 'org-anki--note-at-point (org-anki--get-match) nil org-anki-skip-function))))
 
 ;;;###autoload
 (defun org-anki-update-all (&optional buffer)
