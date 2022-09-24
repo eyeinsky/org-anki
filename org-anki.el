@@ -66,11 +66,6 @@ property"
   :type '(string)
   :group 'org-anki)
 
-(defcustom org-anki-ankiconnnect-listen-address "http://127.0.0.1:8765"
-  "The address of AnkiConnect"
-  :type '(string)
-  :group 'org-anki)
-
 (defcustom org-anki-model-fields
   '(("Basic" "Front" "Back")
     ("Basic (and reversed card)" "Front" "Back")
@@ -79,6 +74,11 @@ property"
     ("Cloze" "Text"))
   "Default fields for note types."
   :type '(repeat (list (repeat string)))
+  :group 'org-anki)
+
+(defcustom org-anki-ankiconnnect-listen-address "http://127.0.0.1:8765"
+  "The address of AnkiConnect"
+  :type '(string)
   :group 'org-anki)
 
 (defcustom org-anki-inherit-tags t
@@ -651,14 +651,13 @@ Pandoc is required to be installed."
           (cond
            ((equal type "Cloze")
             `( ,(cdr (assoc 'value (cdr (assoc 'Text fields))))
-             . nil
-             ))
+             . nil))
            ((equal type "NameDescr")
             `( ,(cdr (assoc 'value (cdr (assoc 'Name  fields))))
              . ,(cdr (assoc 'value (cdr (assoc 'Descr fields))))))
            ((member type '("Basic" "Basic (and reversed card)" "Basic (optional reversed card)"))
             `( ,(cdr (assoc 'value (cdr (assoc 'Front  fields))))
-               . ,(cdr (assoc 'value (cdr (assoc 'Back   fields))))))
+             . ,(cdr (assoc 'value (cdr (assoc 'Back   fields))))))
            (t
             (org-anki--report-error "Unsupported note type: %s" type)))))
 
