@@ -631,11 +631,19 @@ Pandoc is required to be installed."
      (org-anki-connect-request
       (org-anki--body "notesInfo" `(("notes" . ,ids)))
       (lambda (the-result)
-        (insert (format "\n#+%s: %s\n\n" org-anki-prop-deck name))
-        (mapc
-         (lambda (json)
-           (org-anki--write-note (org-anki--parse-note json)))
-         the-result))
+        (with-current-buffer (or buffer (buffer-name))
+          (insert (format "\n#+%s: %s\n\n" org-anki-prop-deck name))
+          (mapc
+           (lambda (json)
+             (message "json %s" json)
+             (promise-chain
+                 (org-anki--parse-note json)
+               (then (lambda (note)
+                       (message "NOTE %s" note)
+                       (org-anki--write-note note)
+                       )))
+             )
+           the-result)))
       (lambda (the-error)
         (org-anki--report-error "Get deck error, received: %s" the-error))))
    (lambda (the-error)
@@ -651,25 +659,39 @@ Pandoc is required to be installed."
           (cond
            ((equal type "Cloze")
             `( ,(cdr (assoc 'value (cdr (assoc 'Text fields))))
-             . nil
-             ))
+               . nil
+               ))
            ((equal type "NameDescr")
             `( ,(cdr (assoc 'value (cdr (assoc 'Name  fields))))
-             . ,(cdr (assoc 'value (cdr (assoc 'Descr fields))))))
+               . ,(cdr (assoc 'value (cdr (assoc 'Descr fields))))))
            ((member type '("Basic" "Basic (and reversed card)" "Basic (optional reversed card)"))
             `( ,(cdr (assoc 'value (cdr (assoc 'Front  fields))))
                . ,(cdr (assoc 'value (cdr (assoc 'Back   fields))))))
            (t
             (org-anki--report-error "Unsupported note type: %s" type)))))
 
-    (make-org-anki--note
-     :maybe-id (field 'noteId)
-     :front    (org-anki--html-to-org (car front-back))
-     :back     (org-anki--html-to-org (cdr front-back))
-     :tags     (append (field 'tags) nil)
-     ;; :deck     deck
-     :type     type
-     :point    nil))))
+      (message " -- HERE -- %s" (vector
+            (org-anki--html-to-org-promise (car front-back))
+            (org-anki--html-to-org-promise (cdr front-back))))
+
+      (promise-chain
+          (promise-all
+           (vector
+            (org-anki--html-to-org-promise (car front-back))
+            (org-anki--html-to-org-promise (cdr front-back))))
+        (then
+         (lambda (res)
+           (message "RES %s" res)
+
+           (make-org-anki--note
+            :maybe-id (field 'noteId)
+            :front    (aref res 0)
+            :back     (aref res 1)
+            :tags     (append (field 'tags) nil)
+            ;; :deck     deck
+            :type     type
+            :point    nil)))
+        (promise-catch (lambda (reason) (message "--- CATCH: %s" reason)))))))
 
 
 (defun org-anki--html-to-org (html)
