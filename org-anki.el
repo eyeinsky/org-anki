@@ -6,7 +6,7 @@
 ;; Version: 1.0.5
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
-;; Package-Requires: ((emacs "27.1") (request "0.3.2") (dash "2.17") (promise "1.1"))
+;; Package-Requires: ((emacs "27.1") (request "0.3.2") (dash "2.17") (promise "1.1") (org-ml "5.8.1"))
 
 ;; This file is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -36,6 +36,7 @@
 (require 'json)
 (require 'org)
 (require 'org-element)
+(require 'org-ml)
 (require 'promise)
 (require 'request)
 (require 'thunk)
@@ -91,6 +92,11 @@ property"
 Given as the SKIP argument to org-map-entries, see its help for
 how to use it to include or skip an entry from being synced."
   :type '(function)
+  :group 'org-anki)
+
+(defcustom org-anki-media-path nil
+  "Path to Anki's media collection, set to nil to turn off copying media."
+  :type '(string)
   :group 'org-anki)
 
 ;; Stolen code
@@ -301,7 +307,9 @@ ignored."
 
 (defun org-anki--string-to-html (string)
   "Convert STRING (org element heading or content) to html."
-  (save-excursion (org-export-string-as string 'html t '(:with-toc nil))))
+  (save-excursion (org-export-string-as
+				   (org-anki--edit-links 'org-anki--remove-media-prefix string)
+				   'html t '(:with-toc nil))))
 
 (defun org-anki--report-error (format error)
   "FORMAT the ERROR and prefix it with `org-anki error'."
@@ -672,13 +680,33 @@ Pandoc is required to be installed."
      :point    nil))))
 
 
+(defun org-anki--add-media-prefix(node)
+  (let* ((path (org-ml-get-property :path node))
+		 (new-path (expand-file-name path org-anki-media-dir)))
+	(org-ml-set-property :path new-path node)))
+
+
+(defun org-anki--remove-media-prefix(node)
+  (let* ((path (org-ml-get-property :path node))
+		 (new-path (file-name-nondirectory path)))
+			 (org-ml-set-property :path new-path node)))
+
+
+(defun org-anki--edit-links (func org-string)
+  (->> (org-ml--from-string org-string)
+	   (org-ml-match-map '(:any * link) func)
+	   (org-ml-to-string)))
+
+
 (defun org-anki--html-to-org (html)
   (if html
-      (replace-regexp-in-string
-       "\n+$" ""
-       (shell-command-to-string
-        (format "pandoc --wrap=none --from=html --to=org <<< %s" (shell-quote-argument html))))
+	  (org-anki--edit-links 'org-anki--add-media-prefix
+       (replace-regexp-in-string
+		"\n+$" ""
+		(shell-command-to-string
+         (format "pandoc --wrap=none --from=html --to=org <<< %s" (shell-quote-argument html)))))
     ""))
+
 
 (defun org-anki--write-note (note)
   ;; Add title
@@ -703,6 +731,18 @@ Pandoc is required to be installed."
         (progn
           (insert content)
           (insert "\n")))))
+
+(defun org-anki-copy-images ()
+  ;; todo: add variables to filter file extensions
+  ;; todo: make image names unique?
+  (interactive)
+  (->> (org-ml-parse-this-subtree)
+	   (org-ml-match '(:any * link))
+	   (--filter (string= (org-ml-get-property :type it)
+						  "file"))
+	   (--map (org-ml-get-property :path it))
+	   (--remove (string-prefix-p org-anki-media-dir it))
+	   (--map (copy-file it org-anki-media-dir t))))
 
 (provide 'org-anki)
 ;;; org-anki.el ends here
