@@ -388,6 +388,15 @@ be removed from the Anki app, return actions that do that."
 
 ;; Helpers
 
+(defun plist-to-assoc (plist)
+  "Convert property list into an association list"
+  (let ((return nil))
+    (while plist
+      (-let (((k v . rest) plist))
+        (setq return (cons `(,k . ,v) return))
+        (setq plist rest)))
+    return))
+
 (defun org-anki--partition (fn list)
   (seq-reduce
    (lambda (acc e)
