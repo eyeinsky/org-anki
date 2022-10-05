@@ -71,7 +71,7 @@ property"
     ("Basic (and reversed card)" "Front" "Back")
     ("Basic (optional reversed card)" "Front" "Back")
     ("NameDescr" "Name" "Descr")
-    ("Cloze" "Text"))
+    ("Cloze" "Text" "Extra"))
   "Default fields for note types."
   :type '(repeat (list (repeat string)))
   :group 'org-anki)
@@ -655,6 +655,79 @@ syntax."
          )))
      (t (message "org-anki: no note id here")))))
 
+
+;; Import
+
+(defun org-anki--get-json-field-value (key fields)
+  (let ((maybe-value (assoc key fields)))
+    (message "MAYBE-VALUE %s" maybe-value)
+    (cdr (assoc 'value (cdr maybe-value)))))
+
+;;; Convert JSON to (("FieldName" . "FieldValue") ..)
+(defun org-anki--json-to-fields (fields-json model-fields)
+  (--map
+   (let ((value-html
+          (format
+           "%s"
+           (org-anki--get-json-field-value (intern it) fields-json))))
+    (cons it (org-anki--html-to-org value-html)))
+   model-fields))
+
+(defun org-anki--parse-note (note-json)
+  (cl-flet ((field (lambda (symbol &optional assoc-list)
+                     (cdr (assoc symbol (or assoc-list note-json))))))
+    (let*
+        ((model-name (field 'modelName))
+         (model-fields (org-anki--get-model-fields model-name))
+         (fields (org-anki--json-to-fields (field 'fields) model-fields)))
+      (make-org-anki--note
+       :maybe-id (field 'noteId)
+       :fields   fields
+       :tags     (append (field 'tags) nil)
+       ;; :deck     deck
+       :type     model-name
+       :point    nil))))
+
+(defun org-anki--html-to-org (html)
+  (if html
+      (replace-regexp-in-string
+       "\n+$" ""
+       (shell-command-to-string
+        (format "pandoc --wrap=none --from=html --to=org <<< %s" (shell-quote-argument html))))
+    ""))
+
+(defun org-anki--write-note-properties (note)
+  ;; Add tags if any
+  (let ((tags (org-anki--note-tags note)))
+    (if tags (insert (concat " :" (mapconcat 'identity tags ":") ":"))))
+  (insert "\n") ; Newline is required to add properties to org entry
+  ;; Add ANKI_NOTE_ID
+  (org-entry-put nil org-anki-prop-note-id (number-to-string (org-anki--note-maybe-id note)))
+  ;; Add ANKI_NOTE_TYPE if not "Basic":
+  (let ((type (org-anki--note-type note)))
+    (if (not (equal type "Basic"))
+        (org-entry-put nil org-anki-note-type type))))
+
+(defun org-anki--multiline-front (fields)
+  (string-search "\n" (cdr (car fields))))
+
+(defun org-anki--write-note (note)
+  (let ((fields (org-anki--note-fields note)))
+    (if (org-anki--multiline-front fields)
+        ;; Note with multiline front
+        (progn
+          (insert "* Note")
+          (org-anki--write-note-properties note)
+          (--each fields
+            (-let [(name . value) it]
+              (insert (format "\n** %s\n%s\n" name value)))))
+      ;; Note with single line front
+      (-let [((_ . front) (_ . back)) fields]
+        (insert (format "* %s" front))
+        (org-anki--write-note-properties note)
+        (insert back)
+        (insert "\n")))))
+
 ;;;###autoload
 (defun org-anki-import-deck (name &optional buffer)
   "Import deck with NAME to current buffer, or to BUFFER when provided.
@@ -682,68 +755,6 @@ Pandoc is required to be installed."
    (lambda (the-error)
      (org-anki--report-error "Get deck error, received: %s" the-error))))
 
-
-(defun org-anki--parse-note (note-json)
-  (cl-flet ((field (lambda (symbol &optional assoc-list)
-                     (cdr (assoc symbol (or assoc-list note-json))))))
-    (let*
-        ((type (field 'modelName))
-         (fields (field 'fields))
-         (front-back
-          (cond
-           ((equal type "Cloze")
-            `( ,(cdr (assoc 'value (cdr (assoc 'Text fields))))
-             . nil))
-           ((equal type "NameDescr")
-            `( ,(cdr (assoc 'value (cdr (assoc 'Name  fields))))
-             . ,(cdr (assoc 'value (cdr (assoc 'Descr fields))))))
-           ((member type '("Basic" "Basic (and reversed card)" "Basic (optional reversed card)"))
-            `( ,(cdr (assoc 'value (cdr (assoc 'Front  fields))))
-             . ,(cdr (assoc 'value (cdr (assoc 'Back   fields))))))
-           (t
-            (org-anki--report-error "Unsupported note type: %s" type)))))
-
-    (make-org-anki--note
-     :maybe-id (field 'noteId)
-     :front    (org-anki--html-to-org (car front-back))
-     :back     (org-anki--html-to-org (cdr front-back))
-     :tags     (append (field 'tags) nil)
-     ;; :deck     deck
-     :type     type
-     :point    nil))))
-
-
-(defun org-anki--html-to-org (html)
-  (if html
-      (replace-regexp-in-string
-       "\n+$" ""
-       (shell-command-to-string
-        (format "pandoc --wrap=none --from=html --to=org <<< %s" (shell-quote-argument html))))
-    ""))
-
-(defun org-anki--write-note (note)
-  ;; Add title
-  (insert "* ")
-  (insert (org-anki--note-front note)) ; todo
-
-  ;; Add tags if any
-  (let ((tags (org-anki--note-tags note)))
-    (if tags (insert (concat " :" (mapconcat 'identity tags ":") ":"))))
-
-  (insert "\n\n")
-  (org-entry-put nil org-anki-prop-note-id (number-to-string (org-anki--note-maybe-id note)))
-
-  ;; Add type if not basic:
-  (let ((type (org-anki--note-type note)))
-    (if (not (equal type "Basic"))
-      (org-entry-put nil org-anki-note-type type)))
-
-  ;; Add content
-  (let ((content (org-anki--note-back note)))
-    (if content
-        (progn
-          (insert content)
-          (insert "\n")))))
 
 (provide 'org-anki)
 ;;; org-anki.el ends here
