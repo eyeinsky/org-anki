@@ -164,13 +164,6 @@ with result."
 
 (cl-defstruct org-anki--note maybe-id fields tags deck type point)
 
-(defun org-anki--entry-content () ; until next subheading, here2, todo: remove me
-  "Get entry content until subheading, convert it into HTML with
-latex equation blocks converted into mathjax."
-  (org-anki--string-to-anki-mathjax
-   (org-anki--string-to-html
-    (org-anki--entry-content-until-any-heading))))
-
 (defun org-anki--string-to-anki-mathjax (latex-code)
   (let ((delimiter-map (list (cons (regexp-quote "\\begin{equation}") "\\\\[")
                              (cons (regexp-quote "\\end{equation}") "\\\\]")
@@ -213,16 +206,19 @@ latex equation blocks converted into mathjax."
      (lambda ()
        (let ((title (org-entry-get nil "ITEM")))
          (if (and (= level (org-current-level)) (member title fields))
-             (progn
-               (setq found (plist-put found title (org-anki--entry-content)))
-               ;; ^ TODO: content with subheadings!
+             (let ((content-with-subentries
+                    (org-anki--org-to-html
+                     (org-anki--entry-content-full))))
+               (setq found (plist-put found title content-with-subentries))
                (setq found-fields (cons title found-fields)))))) nil 'tree)
 
     (let*
         ((fields-length (length fields))
          (found-length (/ (length found) 2))
-         (title (org-anki--string-to-html (org-entry-get nil "ITEM")))
-         (content (org-anki--entry-content)))
+         (title (org-anki--org-to-html (org-entry-get nil "ITEM")))
+         (content
+          (org-anki--org-to-html
+           (org-anki--entry-content-until-any-heading))))
 
       (cond
        ;; title or content is Cloze: create a Cloze
@@ -310,7 +306,7 @@ be removed from the Anki app, return actions that do that."
 ;; org-mode
 
 (defun org-anki--entry-content-until-any-heading ()
-  "Get entry content until any next heading."
+  "Get entry content until any subentry."
   ;; We move around with regexes, so restore original position
   (save-excursion
     ;; Jump to beginning of entry
@@ -324,9 +320,16 @@ be removed from the Anki app, return actions that do that."
           (to (progn (outline-next-heading) (point))))
       (buffer-substring-no-properties from to))))
 
-(defun org-anki--string-to-html (string)
+(defun org-anki--entry-content-full ()
+  "Get entry content with all subentries."
+  (let ((str (org-get-entry)))
+    (substring-no-properties str 0 (length str))))
+
+(defun org-anki--org-to-html (string)
   "Convert STRING (org element heading or content) to html."
-  (save-excursion (org-export-string-as string 'html t '(:with-toc nil))))
+  (save-excursion
+    (org-anki--string-to-anki-mathjax
+     (org-export-string-as string 'html t '(:with-toc nil)))))
 
 (defun org-anki--report-error (format error)
   "FORMAT the ERROR and prefix it with `org-anki error'."
