@@ -387,13 +387,20 @@ ignored."
       ((note-with-action (car pair))
        (note (car note-with-action))
        (action (cdr note-with-action))
-       (result (car (cdr pair))))
+       (result (car (cdr pair)))
+       (error-msg (and (listp result)
+                       (assoc-default 'error result))))
     (cond
      ;; added note
      ((equal "addNote" (assoc-default "action" action))
-      (save-excursion
-        (goto-char (org-anki--note-point note))
-        (org-set-property org-anki-prop-note-id (number-to-string result))))
+      (if (or (not error-msg)
+              (string= "" error-msg))
+          (save-excursion
+            (goto-char (org-anki--note-point note))
+            (org-set-property org-anki-prop-note-id (number-to-string result)))
+        (org-anki--report-error
+         "Couldn't add note, received error: %s"
+         error-msg)))
      ;; update note
      ((equal "updateNoteFields" (assoc-default "action" action))
       (message "org-anki: note succesfully updated: %s" (org-anki--note-maybe-id note))))))
