@@ -205,7 +205,7 @@ latex equation blocks converted into mathjax."
 (defun org-anki--get-fields (type)
   ;; :: String -> IO [(Field, Value)]
   (let*
-      ((fields (cdr (assoc type org-anki-model-fields))) ; fields for TYPE
+      ((fields (org-anki--get-model-fields type)) ; fields for TYPE
        (found nil) ; init property list from field to value
        (found-fields nil) ; init list for found fields
        (level (+ 1 (org-current-level)))) ; subentry level
@@ -544,6 +544,10 @@ be removed from the Anki app, return actions that do that."
             "org-anki-delete-all error: %s"
             the-error))))))
 
+(defun org-anki--get-model-fields (model)
+  ;; :: String -> [FieldName]
+  (cdr (assoc model org-anki-model-fields)))
+
 ;; Public API
 
 ;;; Convenience functions
@@ -665,6 +669,7 @@ Pandoc is required to be installed."
         (org-anki--report-error "Get deck error, received: %s" the-error))))
    (lambda (the-error)
      (org-anki--report-error "Get deck error, received: %s" the-error))))
+
 
 (defun org-anki--parse-note (note-json)
   (cl-flet ((field (lambda (symbol &optional assoc-list)
