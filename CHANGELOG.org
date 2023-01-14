@@ -1,3 +1,12 @@
+* v2.0.0
+- support multiline card front:
+
+  When an org entry has subheadings that exactly match the note
+  titles, then use contents of these entries as the values for the
+  fields.
+
+  When all but one headings match, then content of the missing field
+  is taken from the body of the main title.
 * v1.0.3
 - add customizable =org-anki-skip-function= to include/skip entries
   when using =org-anki-sync-all=
