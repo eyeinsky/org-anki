@@ -420,20 +420,25 @@ be removed from the Anki app, return actions that do that."
 
 (defun org-anki--handle-pair (pair)
   ;; :: ((Note, Action), Result) -> IO ()
-  (let*
-      ((note-with-action (car pair))
-       (note (car note-with-action))
-       (action (cdr note-with-action))
-       (result (car (cdr pair))))
-    (cond
-     ;; added note
-     ((equal "addNote" (assoc-default "action" action))
-      (save-excursion
-        (goto-char (org-anki--note-point note))
-        (org-set-property org-anki-prop-note-id (number-to-string result))))
-     ;; update note
-     ((equal "updateNoteFields" (assoc-default "action" action))
-      (message "org-anki: note succesfully updated: %s" (org-anki--note-maybe-id note))))))
+  (-let*
+      ((((note . action) result &rest _) pair)
+       (action-value  (assoc-default "action" action))
+       (error-msg (and (listp result)
+                       (assoc-default 'error result))))
+    (if error-msg
+        ;; report error
+        (org-anki--report-error "Couldn't add note, received error: %s" error-msg)
+      (cond
+       ;; added note
+       ((equal "addNote" action-value)
+        (save-excursion
+          (goto-char (org-anki--note-point note))
+          (org-set-property org-anki-prop-note-id (number-to-string result))))
+       ;; update note: do nothing but message success
+       ((equal "updateNoteFields" action-value)
+        (message
+         "org-anki: note succesfully updated: %s"
+         (org-anki--note-maybe-id note)))))))
 
 (defun org-anki--existing-tags (notes)
   ;; :: [Note] -> Promise (AList Id [Tag])
@@ -449,6 +454,7 @@ be removed from the Anki app, return actions that do that."
          (funcall resolve nil))))))
 
 (defun org-anki--execute-api-actions (note-action-pairs)
+  ;; :: [(Note, Action)] -> IO ()
   (let ((actions (--map (cdr it) note-action-pairs)))
     (org-anki-connect-request
      (org-anki--multi actions)
@@ -477,7 +483,7 @@ be removed from the Anki app, return actions that do that."
           (org-anki--existing-tags notes)
         (then
          (lambda (all-existing-tags)
-           (let*
+           (-let*
                (
                 ;; Calculate added and updated notes
                 (new-and-existing
@@ -487,8 +493,7 @@ be removed from the Anki app, return actions that do that."
                      ((org-anki--note-maybe-id note) (cons :right note))
                      (t                              (cons :left note))))
                   notes))
-                (new (car new-and-existing))      ;; [Note]
-                (existing (cdr new-and-existing)) ;; [Note]
+                ((new . existing) new-and-existing) ;; [Note]
                 (additions (--map (cons it (org-anki--create-note-single it)) new))      ;; [(Note, Action)]
                 (updates   (--map (cons it (org-anki--update-note-single it)) existing)) ;; [(Note, Action)]
 
