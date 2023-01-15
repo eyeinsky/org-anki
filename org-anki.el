@@ -178,12 +178,11 @@ with result."
 (defun org-anki--note-at-point ()
   "Create an Anki note from whereever the cursor is"
   ;; :: IO Note
-  (let*
+  (-let*
       ((maybe-id (org-entry-get nil org-anki-prop-note-id))
        (initial-type (org-anki--find-prop org-anki-note-type org-anki-default-note-type))
-       (type-and-fields (org-anki--get-fields initial-type))
-       (type (car type-and-fields))
-       (fields (plist-to-assoc (cdr type-and-fields)))
+       ((type . fields-plist) (org-anki--get-fields initial-type))
+       (fields (plist-to-assoc fields-plist))
        (tags (org-anki--get-tags))
        (deck (org-anki--find-prop org-anki-prop-deck org-anki-default-deck))
        (note-start (point)))
@@ -196,6 +195,8 @@ with result."
      :point    note-start)))
 
 (defun org-anki--get-fields (type)
+  "Get note field values from entry at point."
+
   ;; :: String -> IO [(Field, Value)]
   (let*
       ((fields (org-anki--get-model-fields type)) ; fields for TYPE
@@ -678,7 +679,7 @@ syntax."
     (cons it (org-anki--html-to-org value-html)))
    model-fields))
 
-(defun org-anki--parse-note (note-json)
+(defun org-anki--parse-note (note-json deck-name)
   (cl-flet ((field (lambda (symbol &optional assoc-list)
                      (cdr (assoc symbol (or assoc-list note-json))))))
     (let*
@@ -689,7 +690,7 @@ syntax."
        :maybe-id (field 'noteId)
        :fields   fields
        :tags     (append (field 'tags) nil)
-       ;; :deck     deck
+       :deck     deck-name
        :type     model-name
        :point    nil))))
 
@@ -753,7 +754,7 @@ Pandoc is required to be installed."
         (insert (format "\n#+%s: %s\n\n" org-anki-prop-deck name))
         (mapc
          (lambda (json)
-           (org-anki--write-note (org-anki--parse-note json)))
+           (org-anki--write-note (org-anki--parse-note json name)))
          the-result))
       (lambda (the-error)
         (org-anki--report-error "Get deck error, received: %s" the-error))))
