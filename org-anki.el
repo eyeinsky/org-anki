@@ -76,6 +76,11 @@ property"
   :type '(repeat (list (repeat string)))
   :group 'org-anki)
 
+(defcustom org-anki-field-templates
+  nil
+  "Default templates for note fields."
+  :group 'org-anki)
+
 (defcustom org-anki-ankiconnnect-listen-address "http://127.0.0.1:8765"
   "The address of AnkiConnect"
   :type '(string)
@@ -175,6 +180,13 @@ with result."
   latex-code
   )
 
+(defun org-anki--apply-templates (fields templates)
+  (--map
+   (-let* (((field-name . field-value) it)
+           ((_ . fn) (assoc field-name templates)))
+     (if fn (cons field-name (funcall fn field-value)) (cons field-name field-value)))
+   fields))
+
 (defun org-anki--note-at-point ()
   "Create an Anki note from whereever the cursor is"
   ;; :: IO Note
@@ -183,12 +195,14 @@ with result."
        (initial-type (org-anki--find-prop org-anki-note-type org-anki-default-note-type))
        ((type . fields-plist) (org-anki--get-fields initial-type))
        (fields (plist-to-assoc fields-plist))
+       ((_ . templates) (assoc type org-anki-field-templates))
        (tags (org-anki--get-tags))
        (deck (org-anki--find-prop org-anki-prop-deck org-anki-default-deck))
        (note-start (point)))
+
     (make-org-anki--note
      :maybe-id (if (stringp maybe-id) (string-to-number maybe-id))
-     :fields   fields
+     :fields   (org-anki--apply-templates fields templates)
      :tags     tags
      :deck     deck
      :type     type
