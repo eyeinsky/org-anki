@@ -1,9 +1,9 @@
 ;;; org-anki.el --- Synchronize org-mode entries to Anki -*- lexical-binding: t -*-
 ;;
-;; Copyright (C) 2022 Markus Läll
+;; Copyright (C) 2020 Markus Läll
 ;;
 ;; URL: https://github.com/eyeinsky/org-anki
-;; Version: 2.0.1
+;; Version: 3.0.0
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
 ;; Package-Requires: ((emacs "27.1") (request "0.3.2") (dash "2.17") (promise "1.1"))
@@ -74,6 +74,11 @@ property"
     ("Cloze" "Text" "Extra"))
   "Default fields for note types."
   :type '(repeat (list (repeat string)))
+  :group 'org-anki)
+
+(defcustom org-anki-field-templates
+  nil
+  "Default templates for note fields."
   :group 'org-anki)
 
 (defcustom org-anki-ankiconnnect-listen-address "http://127.0.0.1:8765"
@@ -175,27 +180,37 @@ with result."
   latex-code
   )
 
+(defun org-anki--apply-templates (fields templates)
+  (--map
+   (-let* (((field-name . field-value) it)
+           ((_ . fn) (assoc field-name templates)))
+     (if fn (cons field-name (funcall fn field-value)) (cons field-name field-value)))
+   fields))
+
 (defun org-anki--note-at-point ()
   "Create an Anki note from whereever the cursor is"
   ;; :: IO Note
-  (let*
+  (-let*
       ((maybe-id (org-entry-get nil org-anki-prop-note-id))
        (initial-type (org-anki--find-prop org-anki-note-type org-anki-default-note-type))
-       (type-and-fields (org-anki--get-fields initial-type))
-       (type (car type-and-fields))
-       (fields (plist-to-assoc (cdr type-and-fields)))
+       ((type . fields-plist) (org-anki--get-fields initial-type))
+       (fields (plist-to-assoc fields-plist))
+       ((_ . templates) (assoc type org-anki-field-templates))
        (tags (org-anki--get-tags))
        (deck (org-anki--find-prop org-anki-prop-deck org-anki-default-deck))
        (note-start (point)))
+
     (make-org-anki--note
      :maybe-id (if (stringp maybe-id) (string-to-number maybe-id))
-     :fields   fields
+     :fields   (org-anki--apply-templates fields templates)
      :tags     tags
      :deck     deck
      :type     type
      :point    note-start)))
 
 (defun org-anki--get-fields (type)
+  "Get note field values from entry at point."
+
   ;; :: String -> IO [(Field, Value)]
   (let*
       ((fields (org-anki--get-model-fields type)) ; fields for TYPE
@@ -678,7 +693,7 @@ syntax."
     (cons it (org-anki--html-to-org value-html)))
    model-fields))
 
-(defun org-anki--parse-note (note-json)
+(defun org-anki--parse-note (note-json deck-name)
   (cl-flet ((field (lambda (symbol &optional assoc-list)
                      (cdr (assoc symbol (or assoc-list note-json))))))
     (let*
@@ -689,7 +704,7 @@ syntax."
        :maybe-id (field 'noteId)
        :fields   fields
        :tags     (append (field 'tags) nil)
-       ;; :deck     deck
+       :deck     deck-name
        :type     model-name
        :point    nil))))
 
@@ -753,7 +768,7 @@ Pandoc is required to be installed."
         (insert (format "\n#+%s: %s\n\n" org-anki-prop-deck name))
         (mapc
          (lambda (json)
-           (org-anki--write-note (org-anki--parse-note json)))
+           (org-anki--write-note (org-anki--parse-note json name)))
          the-result))
       (lambda (the-error)
         (org-anki--report-error "Get deck error, received: %s" the-error))))
