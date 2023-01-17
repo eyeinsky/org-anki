@@ -1,7 +1,7 @@
 * v3.0.0
 - support field templating.
 
-  E.g to add source file name to the `Back` field of `Basic` note type:
+  E.g to add source file name to the =Back= field of =Basic= note type:
   #+begin_src elisp
   (customize-set-variable
    'org-anki-field-templates
