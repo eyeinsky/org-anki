@@ -1,3 +1,16 @@
+* v3.0.0
+- support field templating.
+
+  E.g to add source file name to the `Back` field of `Basic` note type:
+  #+begin_src elisp
+  (customize-set-variable
+   'org-anki-field-templates
+   '(("Basic"
+      ("Back" . (lambda (it)
+                  (let ((path (buffer-file-name)))
+                    (concat it (format "<p><a href='%s'>%s</a></p>" path path))))))))
+  #+end_src
+
 * v2.0.0
 - support multiline card front:
 
