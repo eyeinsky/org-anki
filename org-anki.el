@@ -237,7 +237,7 @@ with result."
 
       (cond
        ;; title or content is Cloze: create a Cloze
-       ((org-anki--is-cloze title) `("Cloze" "Text" ,title))
+       ((org-anki--is-cloze title) `("Cloze" "Text" ,title "Extra" ,content))
        ((org-anki--is-cloze content) `("Cloze" "Text" ,content))
        ;; no fields are found in subheadings: take entry title and content
        ((= found-length 0)
