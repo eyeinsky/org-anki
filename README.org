@@ -1,14 +1,24 @@
 * org-anki
-Non-invasive minor mode to synchronize your org-mode notes to Anki.
+Non-invasive minor mode to synchronize your org-mode notes to Anki
+from within Emacs.
 
-Works via [[https://foosoft.net/projects/anki-connect/][AnkiConnect]] add-on to [[https://apps.ankiweb.net/][Anki]].[fn:via]
+Requires [[https://foosoft.net/projects/anki-connect/][AnkiConnect]] to be added to [[https://apps.ankiweb.net/][Anki]].[fn:via]
 
-Features deck import via =org-anki-import-deck= (requires pandoc for
-converting html to org).
+Features:
+- sync simple org entries to Anki, entry's title is taken as =Front=
+  (=Name=) and content an =Back= (=Descr=)
+- note updates
+- sync/update tags
+- tag inheritance from global and file level properties, and from ancestors
+- custom deck name defined globally, per file, per subtree, or even for each
+  org entry separately
+- Cloze notes via interactive prompt (a al anki-editor) or via
+  ={{..}}= syntax directly
+- sync single org entry (convenient to bind this to a keyboard shortcut)
+- customize Anki note type and field names
+- import external deck from Anki (requires pandoc for html-to-org conversion).
 
 ** How
-Creates "Basic" or "Cloze" type notes.
-
 By default "Basic" cards are created where org entry's heading is the
 card front and content is the back.[fn:how] If the heading has Cloze
 syntax (={{...}}=) then the heading is used to create both the
@@ -68,14 +78,14 @@ lose their scheduling information.
   ="Basic"=.
 
 ** Why
-.. as there are [[https://github.com/louietan/anki-editor][anki-editor]], [[https://github.com/abo-abo/pamparam][pamparam]], [[https://gitlab.com/phillord/org-drill][org-drill]], [[https://github.com/l3kn/org-fc][org-fc]]?
+.. as there are [[https://github.com/louietan/anki-editor][anki-editor]], [[https://github.com/abo-abo/pamparam][pamparam]], [[https://gitlab.com/phillord/org-drill][org-drill]], [[https://github.com/l3kn/org-fc][org-fc]], [[https://github.com/c-okelly/org_to_anki][org_to_anki]]?
 
-Anki-editor requires subheadings for card front and card back, thus existing .org notes
-need to be modified to be ankified. This package takes the heading as
-card front and content as card back.
+This project started out to support converting simple org entries to
+Anki notes where note `Front` field is taken from the title and `Back`
+field is taken from the content. Over time many more features have
+been added.
 
-The other three are emacs or org-mode only[fn:others], so no spaced repetition
-from your phone or web.
+
 ** Footnotes
 
 [fn:via] AnkiConnect starts a HTTP server on localhost:8765 which the
@@ -83,5 +93,3 @@ current package talks to.
 
 [fn:how] It does this even if the next heading is a sub-heading (you
 probably don't want subheadings in card contents anyway).
-
-[fn:others] I mean, do you really want to use this just to use Anki?? :p
