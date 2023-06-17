@@ -98,10 +98,10 @@ how to use it to include or skip an entry from being synced."
   :type '(function)
   :group 'org-anki)
 
-(defcustom org-anki-allow-duplicates :json-false
-  "Allow duplicates, set to :json-false to turn off and t to turn on."
+(defcustom org-anki-allow-duplicates nil
+  "Allow duplicates."
   :type '(choice (const :tag "Yes" t)
-                 (const :tag "No" :json-false))
+                 (const :tag "No" nil))
   :group 'org-anki)
 
 ;; Stolen code
@@ -278,7 +278,7 @@ card FRONT and BACK strings."
        ,@(org-anki--note-to-json note)
        ("tags" . ,(if (org-anki--note-tags note) (org-anki--note-tags note) ""))
        ("options" .
-        (("allowDuplicate" . ,org-anki-allow-duplicates)
+        (("allowDuplicate" . ,(or org-anki-allow-duplicates :json-false))
          ("duplicateScope" . "deck"))))))))
 
 (defun org-anki--update-note-single (note)
