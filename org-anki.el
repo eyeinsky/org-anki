@@ -365,7 +365,7 @@ be removed from the Anki app, return actions that do that."
   "Find property with NAME from
 1. item,
 2. inherited from parents
-3. as in-buffer setting
+3. in-buffer setting
 4. otherwise use DEFAULT"
   (thunk-let
    ((prop-item (org-entry-get nil name t))
