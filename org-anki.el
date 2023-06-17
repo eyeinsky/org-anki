@@ -98,6 +98,12 @@ how to use it to include or skip an entry from being synced."
   :type '(function)
   :group 'org-anki)
 
+(defcustom org-anki-allow-duplicates nil
+  "Allow duplicates."
+  :type '(choice (const :tag "Yes" t)
+                 (const :tag "No" nil))
+  :group 'org-anki)
+
 ;; Stolen code
 
 ;; Get list of global properties
@@ -272,7 +278,7 @@ card FRONT and BACK strings."
        ,@(org-anki--note-to-json note)
        ("tags" . ,(if (org-anki--note-tags note) (org-anki--note-tags note) ""))
        ("options" .
-        (("allowDuplicate" . :json-false)
+        (("allowDuplicate" . ,(or org-anki-allow-duplicates :json-false))
          ("duplicateScope" . "deck"))))))))
 
 (defun org-anki--update-note-single (note)
@@ -359,7 +365,7 @@ be removed from the Anki app, return actions that do that."
   "Find property with NAME from
 1. item,
 2. inherited from parents
-3. as in-buffer setting
+3. in-buffer setting
 4. otherwise use DEFAULT"
   (thunk-let
    ((prop-item (org-entry-get nil name t))
