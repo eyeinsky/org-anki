@@ -1,3 +1,6 @@
+* v3.1.0
+- add org entry content as =Extra= field to Cloze notes
+- support duplicate notes via customizable variable =org-anki-allow-duplicates=
 * v3.0.0
 - support field templating.
 
