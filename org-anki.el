@@ -76,10 +76,16 @@ property"
   :type '(repeat (list (repeat string)))
   :group 'org-anki)
 
-(defcustom org-anki-field-templates
-  nil
+(defcustom org-anki-field-templates nil
   "Default templates for note fields."
+  :type '(alist
+          :key-type string
+          :value-type (alist
+                       :key-type string
+                       :value-type sexp))
   :group 'org-anki)
+  ;; The sexp value above should be a function from string to string,
+  ;; See https://github.com/eyeinsky/org-anki/pull/58 for more.
 
 (defcustom org-anki-ankiconnnect-listen-address "http://127.0.0.1:8765"
   "The address of AnkiConnect"
@@ -176,15 +182,14 @@ with result."
 (cl-defstruct org-anki--note maybe-id fields tags deck type point)
 
 (defun org-anki--string-to-anki-mathjax (latex-code)
-  (let ((delimiter-map (list (cons (regexp-quote "\\begin{equation}") "\\\\[")
-                             (cons (regexp-quote "\\end{equation}") "\\\\]")
-                             (cons (regexp-quote "\\begin{align}") "\\\\[\n\\\\begin{aligned}")
-                             (cons (regexp-quote "\\end{align}") "\\\\end{aligned}\n\\\\]")))
-        (matched nil))
-    (dolist (delimiter delimiter-map)
-      (setq latex-code (replace-regexp-in-string (car delimiter) (cdr delimiter) latex-code))))
-  latex-code
-  )
+  ;; :: String -> String
+  (--reduce-from
+   (replace-regexp-in-string (regexp-quote (car it)) (cdr it) acc)
+   latex-code
+   '(("\\begin{equation}" . "\\\\[")
+     ("\\end{equation}"   . "\\\\]")
+     ("\\begin{align}"    . "\\\\[\n\\\\begin{aligned}")
+     ("\\end{align}"      . "\\\\end{aligned}\n\\\\]"))))
 
 (defun org-anki--apply-templates (fields templates)
   (--map
@@ -257,9 +262,7 @@ with result."
         (let ((missing-field (car (-difference fields found-fields))))
           `(,type ,@(plist-put found missing-field content))))
        (t (org-anki--report-error
-           "org-anki--get-fields: %s"
-           ,("fields required" . fields)
-           ,("fields found" . found-fields)))))))
+           "org-anki--get-fields: fields required: %s, fields found: %s" fields found-fields))))))
 
 ;;; JSON payloads
 
@@ -354,10 +357,10 @@ be removed from the Anki app, return actions that do that."
     (org-anki--string-to-anki-mathjax
      (org-export-string-as string 'html t '(:with-toc nil)))))
 
-(defun org-anki--report-error (format error)
+(defun org-anki--report-error (format &rest args)
   "FORMAT the ERROR and prefix it with `org-anki error'."
-  (let ((fmt0 (concat "org-anki error: " format)))
-    (message fmt0 error)))
+  (let ((fmt (concat "org-anki error: " format)))
+    (message fmt args)))
 
 (defun org-anki--no-action () (message "No action taken."))
 
@@ -448,6 +451,7 @@ be removed from the Anki app, return actions that do that."
        (action-value  (assoc-default "action" action))
        (error-msg (and (listp result)
                        (assoc-default 'error result))))
+    (ignore &rest)
     (if error-msg
         ;; report error
         (org-anki--report-error "Couldn't add note, received error: %s" error-msg)
@@ -544,10 +548,10 @@ be removed from the Anki app, return actions that do that."
                         (note (car pair))
                         (action (cdr pair)))
 
-                   (message "one update" action)
+                   (message "one update: %s" action)
                    (org-anki-connect-request
                     action
-                    (lambda (the-result)
+                    (lambda (_the-result)
                       (message
                        "org-anki: note succesfully updated: %s"
                        (org-anki--note-maybe-id note)))
@@ -674,7 +678,7 @@ syntax."
        (org-anki--body
         "guiBrowse"
         `(("query" . ,(concat "nid:" maybe-id))))
-       (lambda (the-result)
+       (lambda (_the-result)
          (message "org-anki: send request succesfully, please switch to anki"))
        (lambda (the-error)
          (org-anki--report-error
@@ -760,28 +764,31 @@ syntax."
 (defun org-anki-import-deck (name &optional buffer)
   "Import deck with NAME to current buffer, or to BUFFER when provided.
 
-This is a best-effort command which doesn't support all of Anki's features. Its use case is to import a deck to an .org which from then on will be used as source-of-truth for the notes.
+This is a best-effort command which doesn't support all of Anki's
+features. Its use case is to import a deck to an .org which from
+then on will be used as source-of-truth for the notes.
 
 Pandoc is required to be installed."
 
   (interactive "sDeck name: ")
-  (org-anki-connect-request
-   (org-anki--body
-    "findNotes"
-    `(("query" . ,(concat "deck:" name))))
-   (lambda (ids)
-     (org-anki-connect-request
-      (org-anki--body "notesInfo" `(("notes" . ,ids)))
-      (lambda (the-result)
-        (insert (format "\n#+%s: %s\n\n" org-anki-prop-deck name))
-        (mapc
-         (lambda (json)
-           (org-anki--write-note (org-anki--parse-note json name)))
-         the-result))
-      (lambda (the-error)
-        (org-anki--report-error "Get deck error, received: %s" the-error))))
-   (lambda (the-error)
-     (org-anki--report-error "Get deck error, received: %s" the-error))))
+  (with-current-buffer (or buffer (buffer-name))
+    (org-anki-connect-request
+     (org-anki--body
+      "findNotes"
+      `(("query" . ,(concat "deck:" name))))
+     (lambda (ids)
+       (org-anki-connect-request
+        (org-anki--body "notesInfo" `(("notes" . ,ids)))
+        (lambda (the-result)
+          (insert (format "\n#+%s: %s\n\n" org-anki-prop-deck name))
+          (mapc
+           (lambda (json)
+             (org-anki--write-note (org-anki--parse-note json name)))
+           the-result))
+        (lambda (the-error)
+          (org-anki--report-error "Get deck error, received: %s" the-error))))
+     (lambda (the-error)
+       (org-anki--report-error "Get deck error, received: %s" the-error)))))
 
 
 (provide 'org-anki)
