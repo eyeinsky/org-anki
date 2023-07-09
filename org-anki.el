@@ -3,7 +3,7 @@
 ;; Copyright (C) 2020 Markus Läll
 ;;
 ;; URL: https://github.com/eyeinsky/org-anki
-;; Version: 3.1.0
+;; Version: 3.1.1
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
 ;; Package-Requires: ((emacs "27.1") (request "0.3.2") (dash "2.17") (promise "1.1"))
@@ -149,8 +149,10 @@ with result."
 
       :error
       (cl-function
-       (lambda (&rest _args)
-         (debug "Error response in variable '_args'")))
+       (lambda (&key error-thrown &allow-other-keys)
+         (org-anki--report-error
+          "Can't connect to Anki: is the application running and is AnkiConnect installed?\n\nGot error: %s"
+          (cdr error-thrown))))
 
       :success
       (cl-function
@@ -160,7 +162,7 @@ with result."
            (if the-error
                (if on-error
                    (funcall on-error the-error)
-                 (error "Unhandled error: %s" the-error))
+                 (org-anki--report-error "Unhandled error: %s" the-error))
            (funcall on-result the-result))))))))
 
 (defun org-anki--get-current-tags (ids)
