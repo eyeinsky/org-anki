@@ -3,7 +3,7 @@
 ;; Copyright (C) 2020 Markus Läll
 ;;
 ;; URL: https://github.com/eyeinsky/org-anki
-;; Version: 3.1.1
+;; Version: 3.1.2
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
 ;; Package-Requires: ((emacs "27.1") (request "0.3.2") (dash "2.17") (promise "1.1"))
@@ -364,7 +364,17 @@ be removed from the Anki app, return actions that do that."
   (let ((fmt (concat "org-anki error: " format)))
     (message fmt args)))
 
-(defun org-anki--no-action () (message "No action taken."))
+(defun org-anki--report (format_ &rest args)
+  "FORMAT_ the ARGS and prefix it with `org-anki'."
+  (let* ((fmt (concat "org-anki: " format_)))
+    (message fmt args)))
+
+(defun org-anki--debug (format_ &rest args)
+  "FORMAT_ the ARGS and prefix it with `org-anki'."
+  (let* ((fmt (concat "org-anki debug: " format_)))
+    (message fmt args)))
+
+(defun org-anki--no-action () (org-anki--report "No action taken."))
 
 (defun org-anki--find-prop (name default)
   "Find property with NAME from
@@ -465,8 +475,8 @@ be removed from the Anki app, return actions that do that."
           (org-set-property org-anki-prop-note-id (number-to-string result))))
        ;; update note: do nothing but message success
        ((equal "updateNoteFields" action-value)
-        (message
-         "org-anki: note succesfully updated: %s"
+        (org-anki--report
+         "note succesfully updated: %s"
          (org-anki--note-maybe-id note)))))))
 
 (defun org-anki--existing-tags (notes)
@@ -550,12 +560,11 @@ be removed from the Anki app, return actions that do that."
                         (note (car pair))
                         (action (cdr pair)))
 
-                   (message "one update: %s" action)
                    (org-anki-connect-request
                     action
                     (lambda (_the-result)
-                      (message
-                       "org-anki: note succesfully updated: %s"
+                      (org-anki--report
+                       "note succesfully updated: %s"
                        (org-anki--note-maybe-id note)))
                     (lambda (the-error)
                       (org-anki--report-error
@@ -681,20 +690,20 @@ syntax."
         "guiBrowse"
         `(("query" . ,(concat "nid:" maybe-id))))
        (lambda (_the-result)
-         (message "org-anki: send request succesfully, please switch to anki"))
+         (org-anki--report "send request succesfully, please switch to anki"))
        (lambda (the-error)
          (org-anki--report-error
           "Browse error, received: %s"
           the-error)
          )))
-     (t (message "org-anki: no note id here")))))
+     (t (org-anki--report "no note id here")))))
 
 
 ;; Import
 
 (defun org-anki--get-json-field-value (key fields)
   (let ((maybe-value (assoc key fields)))
-    (message "MAYBE-VALUE %s" maybe-value)
+    (org-anki--debug "MAYBE-VALUE %s" maybe-value)
     (cdr (assoc 'value (cdr maybe-value)))))
 
 ;;; Convert JSON to (("FieldName" . "FieldValue") ..)
