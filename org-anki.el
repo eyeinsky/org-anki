@@ -647,7 +647,7 @@ Updates all entries that have ANKI_NOTE_ID property set."
   (interactive)
   (with-current-buffer (or buffer (buffer-name))
     (org-anki--sync-notes
-     (org-map-entries 'org-anki--note-at-point "ANKI_NOTE_ID<>\"\""))))
+     (org-map-entries 'org-anki--note-at-point (conat org-anki-prop-note-id "<>\"\"")))))
 
 ;;;###autoload
 (defun org-anki-delete-entry ()
@@ -668,7 +668,7 @@ Updates all entries that have ANKI_NOTE_ID property set."
     (if (y-or-n-p prompt)
         (with-current-buffer buffer-name_
           (org-anki--delete-notes_
-           (org-map-entries 'org-anki--note-at-point "ANKI_NOTE_ID<>\"\"")))
+           (org-map-entries 'org-anki--note-at-point (concat org-anki-prop-note-id "<>\"\""))))
       (org-anki--no-action))))
 
 ;; Stolen from https://github.com/louietan/anki-editor
