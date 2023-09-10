@@ -476,7 +476,7 @@ be removed from the Anki app, return actions that do that."
        ;; added note
        ((equal "addNote" action-value)
         (save-excursion
-          (goto-char (marker-position (org-anki--note-marker note)))
+          (goto-char (org-anki--note-marker note))
           (org-set-property org-anki-prop-note-id (number-to-string result))))
        ;; update note: do nothing but message success
        ((equal "updateNoteFields" action-value)
@@ -596,7 +596,7 @@ be removed from the Anki app, return actions that do that."
            (-map
             (lambda (note)
               (save-excursion
-                (goto-char (marker-position (org-anki--note-marker note)))
+                (goto-char (org-anki--note-marker note))
                 (org-delete-property org-anki-prop-note-id)))
             (reverse notes))
            )
