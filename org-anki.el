@@ -220,10 +220,12 @@ with result."
      :type     type
      :marker   (point-marker))))
 
+;; TODO how to delete markers properly?
 (defun org-anki--delete-markers (notes)
   "Delete the markers held by NOTES."
   (-map (lambda (note)
-          (set-marker (org-anki--note-marker note) nil))
+          (when (org-anki--note-marker note)
+            (set-marker (org-anki--note-marker note) nil)))
         notes))
 
 (defun org-anki--get-fields (type)
@@ -583,7 +585,6 @@ be removed from the Anki app, return actions that do that."
              ;; It's not just one updated note, default to multi;; hit this branch
              (let ((note-action-pairs (-concat additions updates notes-and-tag-actions2))) ;; [(Note, Action)]
                (org-anki--execute-api-actions note-action-pairs))))))
-      (finally (lambda () (org-anki--delete-markers notes)))
       (promise-catch (lambda (reason) (error reason))))))
 
 (defun org-anki--delete-notes_ (notes)
@@ -603,8 +604,7 @@ be removed from the Anki app, return actions that do that."
          (lambda (the-error)
            (org-anki--report-error
             "org-anki-delete-all error: %s"
-            the-error)))))
-  (org-anki--delete-markers notes))
+            the-error))))))
 
 (defun org-anki--get-model-fields (model)
   ;; :: String -> [FieldName]
