@@ -220,14 +220,6 @@ with result."
      :type     type
      :marker   (point-marker))))
 
-;; TODO how to delete markers properly?
-(defun org-anki--delete-markers (notes)
-  "Delete the markers held by NOTES."
-  (-map (lambda (note)
-          (when (org-anki--note-marker note)
-            (set-marker (org-anki--note-marker note) nil)))
-        notes))
-
 (defun org-anki--get-fields (type)
   "Get note field values from entry at point."
 
@@ -477,9 +469,11 @@ be removed from the Anki app, return actions that do that."
       (cond
        ;; added note
        ((equal "addNote" action-value)
-        (save-excursion
-          (goto-char (org-anki--note-marker note))
-          (org-set-property org-anki-prop-note-id (number-to-string result))))
+        (with-current-buffer (or (marker-buffer (org-anki--note-marker note))
+                                 (current-buffer))
+          (save-excursion
+            (goto-char (org-anki--note-marker note))
+            (org-set-property org-anki-prop-note-id (number-to-string result)))))
        ;; update note: do nothing but message success
        ((equal "updateNoteFields" action-value)
         (org-anki--report
@@ -596,9 +590,11 @@ be removed from the Anki app, return actions that do that."
          (lambda (_)
            (-map
             (lambda (note)
-              (save-excursion
-                (goto-char (org-anki--note-marker note))
-                (org-delete-property org-anki-prop-note-id)))
+              (with-current-buffer (or (marker-buffer (org-anki--note-marker note))
+                                       (current-buffer))
+                (save-excursion
+                  (goto-char (org-anki--note-marker note))
+                  (org-delete-property org-anki-prop-note-id))))
             (reverse notes))
            )
          (lambda (the-error)
