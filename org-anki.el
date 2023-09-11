@@ -201,7 +201,7 @@ with result."
    fields))
 
 (defun org-anki--note-at-point ()
-  "Create an Anki note from whereever the cursor is"
+  "Create an Anki note from wherever the cursor is."
   ;; :: IO Note
   (-let*
       ((maybe-id (org-entry-get nil org-anki-prop-note-id))
@@ -555,7 +555,7 @@ be removed from the Anki app, return actions that do that."
 
            (if (and (= (length updates) 1) (= (length notes) 1))
 
-               ;; If there there is only one update, then don't use
+               ;; If there is only one update, then don't use
                ;; multi for that:
                (let* ((pair (car updates))
                       (note (car pair))
@@ -576,7 +576,7 @@ be removed from the Anki app, return actions that do that."
                  (if notes-and-tag-actions2
                      (org-anki--execute-api-actions notes-and-tag-actions2)))
 
-             ;; It's not just one updated note, default to multi;; hit this branch
+             ;; It's not just one updated note, default to multi
              (let ((note-action-pairs (-concat additions updates notes-and-tag-actions2))) ;; [(Note, Action)]
                (org-anki--execute-api-actions note-action-pairs))))))
       (promise-catch (lambda (reason) (error reason))))))
