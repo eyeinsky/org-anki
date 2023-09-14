@@ -67,6 +67,17 @@ lose their scheduling information.
 - =org-anki-default-note-type= :: set note type. By default this is
   ="Basic"=.
 
+** Troubleshooting & extending
+
+- Error =(wrong-number-of-arguments (3 . 4) 2)=: few users have
+  reported this. The fix is to completely remove the emacs-promise package and
+  then reinstall it. [[https://github.com/eyeinsky/org-anki/issues/54][More here #54]]
+
+- Running =org-anki-sync-entry= multiple times in an elisp script
+  currently doesn't work: when they return concurrently then adding
+  note ID attributes will shift the entries around so they will be
+  added to the wrong locations.
+
 ** Why
 .. as there are [[https://github.com/louietan/anki-editor][anki-editor]], [[https://github.com/abo-abo/pamparam][pamparam]], [[https://gitlab.com/phillord/org-drill][org-drill]], [[https://github.com/l3kn/org-fc][org-fc]]?
 
