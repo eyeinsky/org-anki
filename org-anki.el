@@ -181,7 +181,7 @@ with result."
 
 ;; Note
 
-(cl-defstruct org-anki--note maybe-id fields tags deck type marker)
+(cl-defstruct org-anki--note maybe-id fields tags deck type buffer point)
 
 (defun org-anki--string-to-anki-mathjax (latex-code)
   ;; :: String -> String
@@ -218,7 +218,8 @@ with result."
      :tags     tags
      :deck     deck
      :type     type
-     :marker   (point-marker))))
+     :buffer (current-buffer)
+     :point   (point))))
 
 (defun org-anki--get-fields (type)
   "Get note field values from entry at point."
@@ -453,7 +454,7 @@ be removed from the Anki app, return actions that do that."
 
 (defun org-anki--get-point (note-action-result)
   ;; :: ((Note, Action), Result) -> Point
-  (marker-position (org-anki--note-marker (car (car note-action-result)))))
+  (org-anki--note-point (car (car note-action-result))))
 
 (defun org-anki--handle-pair (pair)
   ;; :: ((Note, Action), Result) -> IO ()
@@ -469,10 +470,10 @@ be removed from the Anki app, return actions that do that."
       (cond
        ;; added note
        ((equal "addNote" action-value)
-        (with-current-buffer (or (marker-buffer (org-anki--note-marker note))
+        (with-current-buffer (or (org-anki--note-buffer note)
                                  (current-buffer))
           (save-excursion
-            (goto-char (org-anki--note-marker note))
+            (goto-char (org-anki--note-point note))
             (org-set-property org-anki-prop-note-id (number-to-string result)))))
        ;; update note: do nothing but message success
        ((equal "updateNoteFields" action-value)
@@ -590,10 +591,10 @@ be removed from the Anki app, return actions that do that."
          (lambda (_)
            (-map
             (lambda (note)
-              (with-current-buffer (or (marker-buffer (org-anki--note-marker note))
+              (with-current-buffer (or (org-anki--note-buffer note)
                                        (current-buffer))
                 (save-excursion
-                  (goto-char (org-anki--note-marker note))
+                  (goto-char (org-anki--note-point note))
                   (org-delete-property org-anki-prop-note-id))))
             (reverse notes))
            )
@@ -621,7 +622,10 @@ be removed from the Anki app, return actions that do that."
 ;;;###autoload
 (defun org-anki-sync-entry ()
   ;; :: IO ()
-  "Synchronize entry at point."
+  "Synchronize entry at point.
+
+Note: do NOT wrap arount this command if you want to sync multi entries simultaneously.
+Call `org-anki--sync-notes' instead, or some notes' anki IDs may be missing."
   (interactive)
   (org-anki--sync-notes (cons (org-anki--note-at-point) nil)))
 
@@ -643,7 +647,7 @@ Updates all entries that have ANKI_NOTE_ID property set."
   (interactive)
   (with-current-buffer (or buffer (buffer-name))
     (org-anki--sync-notes
-     (org-map-entries 'org-anki--note-at-point (conat org-anki-prop-note-id "<>\"\"")))))
+     (org-map-entries 'org-anki--note-at-point (concat org-anki-prop-note-id "<>\"\"")))))
 
 ;;;###autoload
 (defun org-anki-delete-entry ()
@@ -732,7 +736,8 @@ syntax."
        :tags     (append (field 'tags) nil)
        :deck     deck-name
        :type     model-name
-       :marker   nil))))
+       :buffer   nil
+       :point nil))))
 
 (defun org-anki--html-to-org (html)
   (if html
