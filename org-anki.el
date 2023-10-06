@@ -360,10 +360,11 @@ be removed from the Anki app, return actions that do that."
     (substring-no-properties str 0 (length str))))
 
 (defun org-anki--org-to-html (string)
-  "Convert STRING (org element heading or content) to html."
+  "Convert STRING (org element heading or content) to html.
+If org-anki-clozify-links is non-nil, convert org links to cloze fields."
   (save-excursion
     (org-anki--string-to-anki-mathjax
-     (org-export-string-as string 'html t '(:with-toc nil)))))
+     (org-export-string-as (org-anki--links-to-cloze string) 'html t '(:with-toc nil)))))
 
 (defun org-anki--report-error (format &rest args)
   "FORMAT the ERROR and prefix it with `org-anki error'."
@@ -434,9 +435,12 @@ be removed from the Anki app, return actions that do that."
 ;;; Cloze
 
 (defun org-anki--is-cloze (text)
-  "Check if TEXT has cloze syntax, return nil if not."
+  "Check if TEXT has cloze syntax, return nil if not.
+If org-anki-clozify-links is non-nil, consider org links in TEXT to be cloze fields."
   ;; Check for something similar to {{c1::Hidden-text::Hint}} in TEXT
-  (if (string-match "{{c[0-9]+::\\(\n\\|.\\)*}}" text)
+  (if (or (string-match "{{c[0-9]+::\\(\n\\|.\\)*}}" text)
+	  (and org-anki-clozify-links
+	       (string-match org-link-bracket-re text)))
       "Cloze"
     nil))
 
