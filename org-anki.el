@@ -110,6 +110,12 @@ how to use it to include or skip an entry from being synced."
                  (const :tag "No" nil))
   :group 'org-anki)
 
+(defcustom org-anki-clozify-links nil
+  "Convert org-links into cloze fields during the card sync process."
+  :type '(choice (const :tag "Yes" t)
+		 (const :teg "No" nil))
+  :group 'org-anki)
+
 ;; Stolen code
 
 ;; Get list of global properties
@@ -407,6 +413,24 @@ be removed from the Anki app, return actions that do that."
          (org-entry-get nil "TAGS"))
        global-tags)) ":" t)))
 
+(defun org-anki--links-to-cloze (string)
+  "Turn org-links in STRING into cloze fields, where links to the same address have the same cloze field number."
+  ;; based off of org-link-display-format
+  (if org-anki-clozify-links
+      (save-match-data
+	(let ((seen-addresses '()))
+	  (replace-regexp-in-string
+	   org-link-bracket-re
+	   (lambda (match)
+	     (let ((address (match-string 1 match))
+		   (label (match-string 2 match)))
+	       (progn (add-to-list 'seen-addresses address t) ; add address to SEEN-ADDRESSES if not already.
+		      (with-output-to-string
+			(princ (format "{{c%d::%s}}" ; Then, return the new cloze expression where the cloze field number is unique to the address.
+				       (1+ (cl-position address seen-addresses :test #'string=))
+				       (or label address)))))))
+	   string nil)))
+    string))
 ;;; Cloze
 
 (defun org-anki--is-cloze (text)
