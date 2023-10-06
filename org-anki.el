@@ -210,7 +210,8 @@ with result."
        (fields (plist-to-assoc fields-plist))
        ((_ . templates) (assoc type org-anki-field-templates))
        (tags (org-anki--get-tags))
-       (deck (org-anki--find-prop org-anki-prop-deck org-anki-default-deck)))
+       (deck (org-anki--find-prop org-anki-prop-deck org-anki-default-deck))
+       (note-start (point)))
 
     (make-org-anki--note
      :maybe-id (if (stringp maybe-id) (string-to-number maybe-id))
@@ -218,8 +219,8 @@ with result."
      :tags     tags
      :deck     deck
      :type     type
-     :buffer (current-buffer)
-     :point   (point))))
+     :buffer   (current-buffer)
+     :point    note-start)))
 
 (defun org-anki--get-fields (type)
   "Get note field values from entry at point."
@@ -624,7 +625,7 @@ be removed from the Anki app, return actions that do that."
   ;; :: IO ()
   "Synchronize entry at point.
 
-Note: do NOT wrap arount this command if you want to sync multi entries simultaneously.
+Note: do NOT wrap around this command if you want to sync multi entries simultaneously.
 Call `org-anki--sync-notes' instead, or some notes' anki IDs may be missing."
   (interactive)
   (org-anki--sync-notes (cons (org-anki--note-at-point) nil)))
