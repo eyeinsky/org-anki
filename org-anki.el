@@ -229,21 +229,26 @@ with result."
       ((fields (org-anki--get-model-fields type)) ; fields for TYPE
        (found nil) ; init property list from field to value
        (found-fields nil) ; init list for found fields
-       (level (+ 1 (org-current-level)))) ; subentry level
-    (org-map-entries ; try to find fields from subheadings
-     (lambda ()
-       (let ((title (org-entry-get nil "ITEM")))
-         (if (and (= level (org-current-level)) (member title fields))
-             (let ((content-with-subentries
-                    (org-anki--org-to-html
-                     (org-anki--entry-content-full))))
-               (setq found (plist-put found title content-with-subentries))
-               (setq found-fields (cons title found-fields)))))) nil 'tree)
+       (level (+ 1 (or (org-current-level)
+		       (ignore-errors (org-roam-node-level
+				       (org-roam-node-at-point))))))) ; subentry level
+    (unless (ignore-errors (org-roam-node-at-point)) ; excluding roam nodes from this functionality is just a band-aid until a compatible alternative to org-map-entries is found/made.
+      (org-map-entries ; try to find fields from subheadings
+       (lambda ()
+	 (let ((title (org-entry-get nil "ITEM")))
+           (if (and (= level (org-current-level)) (member title fields))
+               (let ((content-with-subentries
+                      (org-anki--org-to-html
+                       (org-anki--entry-content-full))))
+		 (setq found (plist-put found title content-with-subentries))
+		 (setq found-fields (cons title found-fields)))))) nil 'tree))
 
     (let*
         ((fields-length (length fields))
          (found-length (/ (length found) 2))
-         (title (org-anki--org-to-html (org-entry-get nil "ITEM")))
+         (title (org-anki--org-to-html
+		 (or (org-entry-get nil "ITEM")
+		     (ignore-errors (org-roam-node-title (org-roam-node-at-point))))))
          (content
           (org-anki--org-to-html
            (org-anki--entry-content-until-any-heading))))
@@ -337,10 +342,13 @@ be removed from the Anki app, return actions that do that."
   "Get entry content until any subentry."
   ;; We move around with regexes, so restore original position
   (save-excursion
-    ;; Jump to beginning of entry
-    (goto-char (org-entry-beginning-position)) ;; was: (re-search-backward "^\\*+ .*\n")
-    ;; Skip heading
-    (re-search-forward ".*\n")
+    ;; Jump to beginning of entry/node
+    (goto-char (or (ignore-errors (org-entry-beginning-position))
+		   (ignore-errors (org-roam-node-marker (org-roam-node-at-point)))))
+    ; for some reason, org-roam-node-maker is inaccurate when not at the file-level. Odd.
+    ;; Skip heading, if on one.
+    (unless (ignore-errors (eq (org-roam-node-level (org-roam-node-at-point)) 0))
+      (re-search-forward ".*\n"))
     ;; Possibly skip property block until end of entry
     (re-search-forward ":properties:\\(.*\n\\)*:end:" (org-entry-end-position) t)
     ;; Get entry content
