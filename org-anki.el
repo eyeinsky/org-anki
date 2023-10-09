@@ -637,7 +637,23 @@ be removed from the Anki app, return actions that do that."
   (interactive)
   (with-current-buffer (or buffer (buffer-name))
     (org-anki--sync-notes
-     (org-map-entries 'org-anki--note-at-point (org-anki--get-match) nil org-anki-skip-function))))
+     (if (ignore-errors (org-roam-buffer-p buffer))
+	 (mapcar
+	  ;  Because org-roam-db-query returns lists of strings and not
+	  ; node structures, I'm retrieving id numbers from
+	  ; org-roam-db-query and retrieving the node structures from
+	  ; there. But there must be a better way.
+	  (lambda (wrapped-id)
+	    (progn (org-roam-node-open (org-roam-node-from-id (car wrapped-id)) nil t)
+		   (org-anki--note-at-point)))
+	  (org-roam-db-query
+	   [ :select id
+	     :from nodes
+	     :where (= file $s1) ]
+	   (buffer-file-name buffer)))
+       (org-map-entries 'org-anki--note-at-point
+			(org-anki--get-match) nil
+			org-anki-skip-function)))))
 
 ;;;###autoload
 (defun org-anki-update-all (&optional buffer)
@@ -648,7 +664,31 @@ Updates all entries that have ANKI_NOTE_ID property set."
   (interactive)
   (with-current-buffer (or buffer (buffer-name))
     (org-anki--sync-notes
-     (org-map-entries 'org-anki--note-at-point "ANKI_NOTE_ID<>\"\""))))
+     (if (ignore-errors (org-roam-buffer-p buffer))
+	 (mapcar
+	  ;  Because org-roam-db-query returns lists of strings and not
+	  ; node structures, I'm retrieving id numbers from
+	  ; org-roam-db-query and retrieving the node structures from
+	  ; there. But there must be a better way.
+	  ;  TODO figure out how to use emacsql and filter by the right properties.
+	  (lambda (wrapped-id)
+	    (progn (org-roam-node-open (org-roam-node-from-id (car wrapped-id)) nil t)
+		   (org-anki--note-at-point)))
+	  (org-roam-db-query
+	   [ :select id
+	     :from nodes ; Pseudo-code, does not work vvvv
+	     :where (= file $s1) :and (assoc (car properties)) ]
+	   (buffer-file-name buffer)))	    (progn (org-roam-node-open (org-roam-node-from-id (car wrapped-id)) nil t)
+		   (org-anki--note-at-point)))
+	  (org-roam-db-query
+	   [ :select id
+	     :from nodes
+	     :where (= file $s1) ]
+	   (buffer-file-name buffer)))
+       (org-map-entries 'org-anki--note-at-point
+			(org-anki--get-match) nil
+			org-anki-skip-function)))))
+	 (org-map-entries 'org-anki--note-at-point "ANKI_NOTE_ID<>\"\"")))))
 
 ;;;###autoload
 (defun org-anki-delete-entry ()
