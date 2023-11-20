@@ -3,7 +3,7 @@
 ;; Copyright (C) 2020 Markus Läll
 ;;
 ;; URL: https://github.com/eyeinsky/org-anki
-;; Version: 3.1.2
+;; Version: 3.1.3
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
 ;; Package-Requires: ((emacs "27.1") (request "0.3.2") (dash "2.17") (promise "1.1"))
@@ -264,7 +264,8 @@ with result."
         (let ((missing-field (car (-difference fields found-fields))))
           `(,type ,@(plist-put found missing-field content))))
        (t (org-anki--report-error
-           "org-anki--get-fields: fields required: %s, fields found: %s" fields found-fields))))))
+           "org-anki--get-fields: fields required: %s, fields found: %s, at character: %s"
+           fields found-fields (point)))))))
 
 ;;; JSON payloads
 
@@ -362,7 +363,7 @@ be removed from the Anki app, return actions that do that."
 (defun org-anki--report-error (format &rest args)
   "FORMAT the ERROR and prefix it with `org-anki error'."
   (let ((fmt (concat "org-anki error: " format)))
-    (message fmt args)))
+    (apply 'message (cons fmt args))))
 
 (defun org-anki--report (format_ &rest args)
   "FORMAT_ the ARGS and prefix it with `org-anki'."
