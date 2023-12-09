@@ -787,7 +787,7 @@ Pandoc is required to be installed."
     (org-anki-connect-request
      (org-anki--body
       "findNotes"
-      `(("query" . ,(concat "deck:" name))))
+      `(("query" . ,(format "deck:\"%s\"" name))))
      (lambda (ids)
        (org-anki-connect-request
         (org-anki--body "notesInfo" `(("notes" . ,ids)))
