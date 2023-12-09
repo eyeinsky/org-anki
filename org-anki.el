@@ -110,6 +110,12 @@ how to use it to include or skip an entry from being synced."
                  (const :tag "No" nil))
   :group 'org-anki)
 
+(defcustom org-anki-clozify-links nil
+  "Convert org-links into cloze fields during the card sync process."
+  :type '(choice (const :tag "Yes" t)
+		 (const :teg "No" nil))
+  :group 'org-anki)
+
 ;; Stolen code
 
 ;; Get list of global properties
@@ -355,10 +361,11 @@ be removed from the Anki app, return actions that do that."
     (substring-no-properties str 0 (length str))))
 
 (defun org-anki--org-to-html (string)
-  "Convert STRING (org element heading or content) to html."
+  "Convert STRING (org element heading or content) to html.
+If org-anki-clozify-links is non-nil, convert org links to cloze fields."
   (save-excursion
     (org-anki--string-to-anki-mathjax
-     (org-export-string-as string 'html t '(:with-toc nil)))))
+     (org-export-string-as (org-anki--links-to-cloze string) 'html t '(:with-toc nil)))))
 
 (defun org-anki--report-error (format &rest args)
   "FORMAT the ERROR and prefix it with `org-anki error'."
@@ -408,12 +415,33 @@ be removed from the Anki app, return actions that do that."
          (org-entry-get nil "TAGS"))
        global-tags)) ":" t)))
 
+(defun org-anki--links-to-cloze (string)
+  "Turn org-links in STRING into cloze fields, where links to the same address have the same cloze field number."
+  ;; based off of org-link-display-format
+  (if org-anki-clozify-links
+      (save-match-data
+	(let ((seen-addresses '()))
+	  (replace-regexp-in-string
+	   org-link-bracket-re
+	   (lambda (match)
+	     (let ((address (match-string 1 match))
+		   (label (match-string 2 match)))
+	       (progn (add-to-list 'seen-addresses address t) ; add address to SEEN-ADDRESSES if not already.
+		      (with-output-to-string
+			(princ (format "{{c%d::%s}}" ; Then, return the new cloze expression where the cloze field number is unique to the address.
+				       (1+ (cl-position address seen-addresses :test #'string=))
+				       (or label address)))))))
+	   string nil)))
+    string))
 ;;; Cloze
 
 (defun org-anki--is-cloze (text)
-  "Check if TEXT has cloze syntax, return nil if not."
+  "Check if TEXT has cloze syntax, return nil if not.
+If org-anki-clozify-links is non-nil, consider org links in TEXT to be cloze fields."
   ;; Check for something similar to {{c1::Hidden-text::Hint}} in TEXT
-  (if (string-match "{{c[0-9]+::\\(\n\\|.\\)*}}" text)
+  (if (or (string-match "{{c[0-9]+::\\(\n\\|.\\)*}}" text)
+	  (and org-anki-clozify-links
+	       (string-match org-link-bracket-re text)))
       "Cloze"
     nil))
 
