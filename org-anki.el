@@ -92,6 +92,18 @@ property"
   :type '(string)
   :group 'org-anki)
 
+(defcustom org-anki-authentication-key nil
+  "Authentication key to pass to AnkiConnect.
+Alternatively, define org-anki-authentication-key-function."
+  :type '(string)
+  :group 'org-anki)
+
+(defcustom org-anki-authentication-key-function nil
+  "Function which produces the authentication key to pass to AnkiConnect.
+Overrides org-anki-authentication-key."
+  :type '(function)
+  :group 'org-anki)
+
 (defcustom org-anki-inherit-tags t
   "Inherit tags, set to nil to turn off."
   :type 'boolean
@@ -139,7 +151,7 @@ customizable by the org-anki-ankiconnnect-listen-address variable.
 
 BODY is the alist json payload, CALLBACK the function to call
 with result."
-  (let ((json (json-encode `(("version" . 6) ,@body))))
+  (let ((json (json-encode `(("version" . 6) ("key" . ,(org-anki--get-authentication-key)) ,@body))))
     (request
       org-anki-ankiconnnect-listen-address
       :type "GET"
@@ -164,6 +176,13 @@ with result."
                    (funcall on-error the-error)
                  (org-anki--report-error "Unhandled error: %s" the-error))
            (funcall on-result the-result))))))))
+
+(defun org-anki--get-authentication-key ()
+  "Get user-defined authentication key (string) from
+org-anki-authentication-key-function or org-anki-authentication-key."
+  (if org-anki-authentication-key-function
+      (funcall org-anki-authentication-key-function)
+    org-anki-authentication-key))
 
 (defun org-anki--get-current-tags (ids)
   ;; :: [Id] -> Promise [[Tag]]
