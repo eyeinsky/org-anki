@@ -92,6 +92,12 @@ property"
   :type '(string)
   :group 'org-anki)
 
+(defcustom org-anki-api-key nil
+  "API key to authenticate to AnkiConnect.
+See https://foosoft.net/projects/anki-connect/#authentication for more."
+  :type '(string)
+  :group 'org-anki)
+
 (defcustom org-anki-inherit-tags t
   "Inherit tags, set to nil to turn off."
   :type 'boolean
@@ -139,7 +145,10 @@ customizable by the org-anki-ankiconnnect-listen-address variable.
 
 BODY is the alist json payload, CALLBACK the function to call
 with result."
-  (let ((json (json-encode `(("version" . 6) ,@body))))
+  (let ((json (json-encode
+               `(("version" . 6)
+                 ,@(if org-anki-api-key `(("key" . ,org-anki-api-key)))
+                 ,@body))))
     (request
       org-anki-ankiconnnect-listen-address
       :type "GET"
