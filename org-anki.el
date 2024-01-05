@@ -3,7 +3,7 @@
 ;; Copyright (C) 2020 Markus Läll
 ;;
 ;; URL: https://github.com/eyeinsky/org-anki
-;; Version: 3.1.4
+;; Version: 3.2.4
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
 ;; Package-Requires: ((emacs "27.1") (request "0.3.2") (dash "2.17") (promise "1.1"))
@@ -92,6 +92,12 @@ property"
   :type '(string)
   :group 'org-anki)
 
+(defcustom org-anki-api-key nil
+  "API key to authenticate to AnkiConnect.
+See https://foosoft.net/projects/anki-connect/#authentication for more."
+  :type '(string)
+  :group 'org-anki)
+
 (defcustom org-anki-inherit-tags t
   "Inherit tags, set to nil to turn off."
   :type 'boolean
@@ -139,7 +145,10 @@ customizable by the org-anki-ankiconnnect-listen-address variable.
 
 BODY is the alist json payload, CALLBACK the function to call
 with result."
-  (let ((json (json-encode `(("version" . 6) ,@body))))
+  (let ((json (json-encode
+               `(("version" . 6)
+                 ,@(if org-anki-api-key `(("key" . ,org-anki-api-key)))
+                 ,@body))))
     (request
       org-anki-ankiconnnect-listen-address
       :type "GET"
