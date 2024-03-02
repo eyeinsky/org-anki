@@ -650,13 +650,27 @@ be removed from the Anki app, return actions that do that."
 ;;;###autoload
 (defun org-anki-update-all (&optional buffer)
   ;; :: Maybe Buffer -> IO ()
-  "Updates all entries in optional BUFFER.
-
-Updates all entries that have ANKI_NOTE_ID property set."
+  "Updates all entries having ANKI_NOTE_ID property in BUFFER."
   (interactive)
   (with-current-buffer (or buffer (buffer-name))
     (org-anki--sync-notes
      (org-map-entries 'org-anki--note-at-point "ANKI_NOTE_ID<>\"\""))))
+
+;;;###autoload
+(defun org-anki-update-dir (&optional prefix dir)
+  ;; :: Maybe Buffer -> IO ()
+  "Updates all entries having ANKI_NOTE_ID property in every org file in DIR.
+
+If you also want to include its sub-directories, prefix the
+command by hitting `C-u' first."
+  (interactive "P\nDChoose a directory: ")
+  (let* ((org-regex "\\.org\\'")
+         (files (if prefix (directory-files-recursively dir org-regex)
+                  (directory-files dir 'full org-regex))))
+    (dolist (file files)
+      (org-anki--report "updating file %s" file)
+      (with-current-buffer (find-file-noselect file)
+        (org-anki-update-all)))))
 
 ;;;###autoload
 (defun org-anki-delete-entry ()
