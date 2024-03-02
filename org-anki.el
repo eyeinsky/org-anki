@@ -374,17 +374,17 @@ be removed from the Anki app, return actions that do that."
 (defun org-anki--report-error (format &rest args)
   "FORMAT the ERROR and prefix it with `org-anki error'."
   (let ((fmt (concat "org-anki error: " format)))
-    (apply 'message (cons fmt args))))
+    (apply #'message fmt args)))
 
 (defun org-anki--report (format_ &rest args)
   "FORMAT_ the ARGS and prefix it with `org-anki'."
   (let* ((fmt (concat "org-anki: " format_)))
-    (message fmt args)))
+    (apply #'message fmt args)))
 
 (defun org-anki--debug (format_ &rest args)
   "FORMAT_ the ARGS and prefix it with `org-anki'."
   (let* ((fmt (concat "org-anki debug: " format_)))
-    (message fmt args)))
+    (apply #'message fmt args)))
 
 (defun org-anki--no-action () (org-anki--report "No action taken."))
 
