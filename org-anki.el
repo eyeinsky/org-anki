@@ -72,7 +72,9 @@ property"
     ("Basic (optional reversed card)" "Front" "Back")
     ("NameDescr" "Name" "Descr")
     ("Cloze" "Text" "Extra"))
-  "Default fields for note types."
+  "Default fields for note types.
+
+Each one is a list, and the first item is the model name."
   :type '(repeat (list (repeat string)))
   :group 'org-anki)
 
@@ -611,7 +613,11 @@ be removed from the Anki app, return actions that do that."
 
 (defun org-anki--get-model-fields (model)
   ;; :: String -> [FieldName]
-  (cdr (assoc model org-anki-model-fields)))
+  (let ((fields (cdr (assoc model org-anki-model-fields))))
+    (unless fields
+      (error "No fields for '%s', please customize `org-anki-model-fields'."
+             model))
+    fields))
 
 ;; Public API
 
