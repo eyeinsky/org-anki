@@ -659,7 +659,7 @@ be removed from the Anki app, return actions that do that."
 ;;;###autoload
 (defun org-anki-update-dir (&optional prefix dir)
   ;; :: Maybe Buffer -> IO ()
-  "Updates all entries having ANKI_NOTE_ID property in every org file in DIR.
+  "Updates all entries having ANKI_NOTE_ID property in every .org file in DIR.
 
 If you also want to include its sub-directories, prefix the
 command by hitting `C-u' first."
