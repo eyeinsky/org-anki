@@ -37,6 +37,8 @@ after being synced to Anki.
 - =org-anki-browse-entry= :: Browse entry at point on anki's browser dialog with searching nid
 - =org-anki-import-deck= :: Prompts for deck name and imports
   it. Requires pandoc for converting html to org.
+- =org-anki-update-dir= :: Updates all entries having =ANKI_NOTE_ID=
+  property in every .org file in your specified directory.
 
 ** Setup
 - Start Anki with AnkiConnect installed
