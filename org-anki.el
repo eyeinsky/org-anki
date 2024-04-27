@@ -24,8 +24,10 @@
 
 ;;; Commentary:
 
-;; Comprehensive yet minimally-invasive set of commands to for two-way sync of org-mode entries and
-;; Anki notes, including tags, and in either "Basic" or "Cloze" styles, via AnkiConnect and Pandoc.
+;; Non-invasive set of commands to sync org-mode entries to Anki via
+;; AnkiConnect, including tags and custom note types. Also has
+;; rudimentary support for importing existing notes from Anki to org
+;; via Pandoc.
 
 
 ;;; Code:

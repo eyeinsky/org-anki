@@ -23,7 +23,7 @@ after being synced to Anki.
 - =org-anki-sync-entry= :: adds or updates the current org-entry under
      cursor.
 - =org-anki-update-all= :: updates all entries in buffer. "All" means
-  all entries that have ANKI_NOTE_ID property set.
+  all entries that have =ANKI_NOTE_ID= property set.
 - =org-anki-sync-all= :: adds or updates all entries in buffer.
   Use #+ANKI_MATCH: some_property="some value" at top-of-file to
   selectively sync matched entries. Syntax is same as the [[https://orgmode.org/manual/Using-the-Mapping-API.html][MATCH argument for org-map-entries]].
@@ -66,7 +66,8 @@ lose their scheduling information.
   this to =nil= to turn it off.
 - =org-anki-default-note-type= :: set note type. By default this is
   ="Basic"=.
-- =org-anki-api-key= :: API key to authenticate to AnkiConnect. See https://foosoft.net/projects/anki-connect/#authentication for more.
+- =org-anki-api-key= :: API key to authenticate to AnkiConnect. See
+  https://foosoft.net/projects/anki-connect/#authentication for more.
 
 ** Why
 .. as there are [[https://github.com/louietan/anki-editor][anki-editor]], [[https://github.com/abo-abo/pamparam][pamparam]], [[https://gitlab.com/phillord/org-drill][org-drill]], [[https://github.com/l3kn/org-fc][org-fc]]?
