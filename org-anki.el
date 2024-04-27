@@ -24,9 +24,8 @@
 
 ;;; Commentary:
 
-;; Minor mode to synchronize org-mode entries to Anki via AnkiConnect.
-;;
-;; See https://github.com/eyeinsky/org-anki for more.
+;; Comprehensive yet minimally-invasive set of commands to for two-way sync of org-mode entries and
+;; Anki notes, including tags, and in either "Basic" or "Cloze" styles, via AnkiConnect and Pandoc.
 
 
 ;;; Code:
