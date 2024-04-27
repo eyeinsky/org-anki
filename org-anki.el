@@ -3,7 +3,7 @@
 ;; Copyright (C) 2020 Markus Läll
 ;;
 ;; URL: https://github.com/eyeinsky/org-anki
-;; Version: 3.2.5
+;; Version: 3.3.0
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
 ;; Package-Requires: ((emacs "27.1") (request "0.3.2") (dash "2.17") (promise "1.1"))
@@ -374,17 +374,17 @@ be removed from the Anki app, return actions that do that."
 (defun org-anki--report-error (format &rest args)
   "FORMAT the ERROR and prefix it with `org-anki error'."
   (let ((fmt (concat "org-anki error: " format)))
-    (apply 'message (cons fmt args))))
+    (apply #'message fmt args)))
 
 (defun org-anki--report (format_ &rest args)
   "FORMAT_ the ARGS and prefix it with `org-anki'."
   (let* ((fmt (concat "org-anki: " format_)))
-    (message fmt args)))
+    (apply #'message fmt args)))
 
 (defun org-anki--debug (format_ &rest args)
   "FORMAT_ the ARGS and prefix it with `org-anki'."
   (let* ((fmt (concat "org-anki debug: " format_)))
-    (message fmt args)))
+    (apply #'message fmt args)))
 
 (defun org-anki--no-action () (org-anki--report "No action taken."))
 
@@ -650,13 +650,27 @@ be removed from the Anki app, return actions that do that."
 ;;;###autoload
 (defun org-anki-update-all (&optional buffer)
   ;; :: Maybe Buffer -> IO ()
-  "Updates all entries in optional BUFFER.
-
-Updates all entries that have ANKI_NOTE_ID property set."
+  "Updates all entries having ANKI_NOTE_ID property in BUFFER."
   (interactive)
   (with-current-buffer (or buffer (buffer-name))
     (org-anki--sync-notes
      (org-map-entries 'org-anki--note-at-point "ANKI_NOTE_ID<>\"\""))))
+
+;;;###autoload
+(defun org-anki-update-dir (&optional prefix dir)
+  ;; :: Maybe Buffer -> IO ()
+  "Updates all entries having ANKI_NOTE_ID property in every .org file in DIR.
+
+If you also want to include its sub-directories, prefix the
+command by hitting `C-u' first."
+  (interactive "P\nDChoose a directory: ")
+  (let* ((org-regex "\\.org\\'")
+         (files (if prefix (directory-files-recursively dir org-regex)
+                  (directory-files dir 'full org-regex))))
+    (dolist (file files)
+      (org-anki--report "updating file %s" file)
+      (with-current-buffer (find-file-noselect file)
+        (org-anki-update-all)))))
 
 ;;;###autoload
 (defun org-anki-delete-entry ()
