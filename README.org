@@ -1,16 +1,16 @@
-* org-anki
+#+title: org-anki
 Non-invasive minor mode to synchronize your org-mode notes to Anki.
 
-Works via [[https://foosoft.net/projects/anki-connect/][AnkiConnect]] add-on to [[https://apps.ankiweb.net/][Anki]].[fn:via]
+Works via [[https://foosoft.net/projects/anki-connect/][AnkiConnect]] add-on to [[https://apps.ankiweb.net/][Anki]].​*
 
 Features deck import via =org-anki-import-deck= (requires pandoc for
 converting html to org).
 
-** How
+* How
 Creates "Basic" or "Cloze" type notes.
 
 By default "Basic" cards are created where org entry's heading is the
-card front and content is the back.[fn:how] If the heading has Cloze
+card front and content is the back.​** If the heading has Cloze
 syntax (={{...}}=) then the heading is used to create both the
 question and the answer, and content of the org entry is not used.
 
@@ -19,13 +19,13 @@ Tags are also synchronized.
 See [[/example/example.org][example.org]] and the [[/example/][resulting screenshots]] for how the cards look
 after being synced to Anki.
 
-** Commands
+* Commands
 - =org-anki-sync-entry= :: adds or updates the current org-entry under
      cursor.
 - =org-anki-update-all= :: updates all entries in buffer. "All" means
-  all entries that have ANKI_NOTE_ID property set.
+  all entries that have =ANKI_NOTE_ID= property set.
 - =org-anki-sync-all= :: adds or updates all entries in buffer.
-  Use #+ANKI_MATCH: some_property="some value" at top-of-file to
+  Use =#+ANKI_MATCH: some_property​=​"some value"= at top-of-file to
   selectively sync matched entries. Syntax is same as the [[https://orgmode.org/manual/Using-the-Mapping-API.html][MATCH argument for org-map-entries]].
 - =org-anki-delete-entry= :: deletes entry from Anki. Entry must have
      =ANKI_NOTE_ID= property.
@@ -38,7 +38,7 @@ after being synced to Anki.
 - =org-anki-import-deck= :: Prompts for deck name and imports
   it. Requires pandoc for converting html to org.
 
-** Setup
+* Setup
 - Start Anki with AnkiConnect installed
 - Set destination deck name, either as:
   - =(customize-set-variable 'org-anki-default-deck "my-target-deck")= in
@@ -59,7 +59,7 @@ easy.
 In any case, don't forget to create backups, as deleting notes will
 lose their scheduling information.
 
-** Customize
+* Customize
 - =org-anki-ankiconnnect-listen-address= :: set AnkiConnect's listen
   address. Default is =http://127.0.0.1:8765=.
 - =org-anki-inherit-tags= :: tag inheritance is on by default. Set
@@ -67,21 +67,21 @@ lose their scheduling information.
 - =org-anki-default-note-type= :: set note type. By default this is
   ="Basic"=.
 
-** Why
+* Why
 .. as there are [[https://github.com/louietan/anki-editor][anki-editor]], [[https://github.com/abo-abo/pamparam][pamparam]], [[https://gitlab.com/phillord/org-drill][org-drill]], [[https://github.com/l3kn/org-fc][org-fc]]?
 
 Anki-editor requires subheadings for card front and card back, thus existing .org notes
 need to be modified to be ankified. This package takes the heading as
 card front and content as card back.
 
-The other three are emacs or org-mode only[fn:others], so no spaced repetition
+The other three are emacs or org-mode only​***, so no spaced repetition
 from your phone or web.
-** Footnotes
+* Footnotes
 
-[fn:via] AnkiConnect starts a HTTP server on localhost:8765 which the
+​* AnkiConnect starts a HTTP server on localhost:8765 which the
 current package talks to.
 
-[fn:how] It does this even if the next heading is a sub-heading (you
+​** It does this even if the next heading is a sub-heading (you
 probably don't want subheadings in card contents anyway).
 
-[fn:others] I mean, do you really want to use this just to use Anki?? :p
+​*** I mean, do you really want to use this just to use Anki?? :p
