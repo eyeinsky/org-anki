@@ -1,5 +1,5 @@
 * org-anki
-Non-invasive minor mode to synchronize your org-mode notes to Anki.
+Non-invasive set of commands to synchronize org-mode entries to Anki.
 
 Works via [[https://foosoft.net/projects/anki-connect/][AnkiConnect]] add-on to [[https://apps.ankiweb.net/][Anki]].[fn:via]
 
