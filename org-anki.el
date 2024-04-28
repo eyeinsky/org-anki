@@ -415,10 +415,11 @@ be removed from the Anki app, return actions that do that."
 
 (defun org-anki--org-to-html (string)
   "Convert STRING (org element heading or content) to html.
-If org-anki-clozify-links is non-nil, convert org links to cloze fields."
+If `org-anki-cloze-regexps' is non-nil, convert org links to
+cloze fields."
   (save-excursion
     (org-anki--string-to-anki-mathjax
-     (org-export-string-as (org-anki--links-to-cloze string) 'html t '(:with-toc nil)))))
+     (org-export-string-as (org-anki--regexps-to-cloze string) 'html t '(:with-toc nil)))))
 
 (defun org-anki--report-error (format &rest args)
   "FORMAT the ERROR and prefix it with `org-anki error'."
@@ -468,24 +469,31 @@ If org-anki-clozify-links is non-nil, convert org links to cloze fields."
          (org-entry-get nil "TAGS"))
        global-tags)) ":" t)))
 
-(defun org-anki--links-to-cloze (string)
-  "Turn org-links in STRING into cloze fields, where links to the same address have the same cloze field number."
-  ;; based off of org-link-display-format
-  (if org-anki-clozify-links
-      (save-match-data
-	(let ((seen-addresses '()))
-	  (replace-regexp-in-string
-	   org-link-bracket-re
-	   (lambda (match)
-	     (let ((address (match-string 1 match))
-		   (label (match-string 2 match)))
-	       (progn (add-to-list 'seen-addresses address t) ; add address to SEEN-ADDRESSES if not already.
-		      (with-output-to-string
-			(princ (format "{{c%d::%s}}" ; Then, return the new cloze expression where the cloze field number is unique to the address.
-				       (1+ (cl-position address seen-addresses :test #'string=))
-				       (or label address)))))))
-	   string nil)))
-    string))
+(defun org-anki--regexps-to-cloze (string)
+  "Turn regexp matches in STRING into cloze fields according to
+`org-anki-cloze-regexps'."
+  (let ((seen-ids '()))
+    (mapc
+     (lambda (rule)
+       (save-match-data
+         (setq string
+               (replace-regexp-in-string
+                (car rule)
+                (let ((answer (match-string (nth 0 (cdr rule)) match))
+                      (id (match-string (nth 1 (cdr rule)) match))
+                      (hint (match-string (nth 2 (cdr rule)) match)))
+                  (add-to-list 'seen-ids id t)
+                  (with-output-to-string
+                    (princ (concat (format "{{c%d::%s"
+                                           (1+ (cl-position id seen-ids :text #'string=))
+                                           (or answer (match-string 0 match)))
+                                   (if hint
+                                       (format "::%s" hint))
+                                   "}}"))))
+                string nil))))
+     org-anki-cloze-regexps))
+  string)
+
 ;;; Cloze
 
 (defun org-anki--is-cloze (text)
