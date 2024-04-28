@@ -118,9 +118,8 @@ how to use it to include or skip an entry from being synced."
                  (const :tag "No" nil))
   :group 'org-anki)
 
-(defcustom org-anki-cloze-regexps (list '(org-link-bracket-re . (2 1))
-                                             '(org-emph-re (4)))
-  ;; ((regexp . (answer-group id-group hint group)))
+(defcustom org-anki-cloze-regexps '((org-link-bracket-re 2 1)
+                                    (org-emph-re 4))
   "Alist of rules for generating cloze fields, or nil to disable.
 
 Alist of the form ((REGEXP . (ANSWER-GROUP ID-GROUP
@@ -134,30 +133,40 @@ the contents of a cloze field hint. If no ANSWER-GROUP or no
 group indices at all are supplied, the entire match is used as
 the cloze answer.
 
+Rules are used to generate org fields in the order they are
+specified, from the input org text.
+
 By default, org links are made into cloze fields grouped by
 address and org emphases (areas surrounded by *, /, _, +) are
 made into un-grouped cloze fields."
-  :type '(choice :tag "Enabled"
-                 (const :tag "No" nil)
-                 (repeat :tag "Yes, Rule List"
-                         (choice :tag "Rule"
-                                 (const :tag "Clozify Org Links"
-                                        (org-link-bracket-re . (2 1)))
-                                 (const :tag "Clozify Org Emphases (independent)"
-                                        (org-emph-re . (4)))
-                                 (const :tag "Clozify Org Emphases (by type)"
-                                        (org-emph-re . (4 3)))
-                                 (cons :tag "Clozify Other"
-                                       (choice :tag "Expression" regexp sexp)
-                                       (choice :tag "Cloze Parameter Selectors"
-                                               (nil :tag "None (whole match as answer)")
-                                               (list :tag "Match Group Indices"
-                                                     (choice :tag "Answer Group"
-                                                             integer nil)
-                                                     (choice :tag "ID Group"
-                                                             integer nil)
-                                                     (choice :tag "Hint Group"
-                                                             integer nil)))))))
+  :type '(choice
+          :tag "Enabled"
+          (const :tag "No" nil)
+          (repeat
+           :tag "Yes, Rule List"
+           (choice
+            :tag "Rule"
+            (const :tag "Clozify Org Links"
+                   (org-link-bracket-re . (2 1)))
+            (const :tag "Clozify Org Emphases (independent)"
+                   (org-emph-re . (4)))
+            (const :tag "Clozify Org Emphases (by type)"
+                   (org-emph-re . (4 3)))
+            (cons :tag "Clozify Other"
+                  (choice :tag "Expression" regexp sexp)
+                  (choice :tag "Cloze Parameter Selectors"
+                          (const :tag "None (whole match as answer)" nil)
+                          (list :tag "Match Group Indices"
+                                (choice :tag "Answer Group"
+                                        (integer :tag "is index")
+                                        (const :tag "None (whole match as answer)" nil))
+                                (choice :tag "ID Group"
+                                        (const :tag "None (independent)" nil)
+                                        (integer :tag "is index"))
+                                (choice :tag "Hint Group"
+                                        (const :tag "None (no hints)" nil)
+                                        (integer :tag "is index")))))))
+          (sexp :tag "Yes, Sexp"))
   :group 'org-anki)
 
 ;; Stolen code
