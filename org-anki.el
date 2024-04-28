@@ -127,7 +127,7 @@ how to use it to include or skip an entry from being synced."
 (defcustom org-anki-auto-cloze-regexps (list '(org-link-bracket-re . (2 1))
                                              '(org-emph-re (4)))
   ;; ((regexp . (answer-group id-group hint group)))
-  "An alist of regexps and groups for generating cloze fields.
+  "Alist of rules for generating cloze fields, or nil to disable.
 
 Alist of the form ((REGEXP . (ANSWER-GROUP ID-GROUP
 HINT-GROUP))...) where REGEXP is a regex, or sexp which returns
@@ -140,19 +140,19 @@ the contents of a cloze field hint. If no ANSWER-GROUP or no
 group indices at all are supplied, the entire match is used as
 the cloze answer.
 
-By default, when `anki-auto-clozify-regexps' is enabled, org links are
-made into cloze fields grouped by address and org emphases (areas
-surrounded by *, /, _, +) are made into un-grouped cloze fields."
+By default, org links are made into cloze fields grouped by
+address and org emphases (areas surrounded by *, /, _, +) are
+made into un-grouped cloze fields."
   :type '(choice :tag "Enabled"
-                 (const :tag "No")
+                 (const :tag "No" nil)
                  (repeat :tag "Yes, Rule List"
                          (choice :tag "Rule"
                                  (const :tag "Clozify Org Links"
-                                        '(org-link-bracket-re . (2 1)))
+                                        (org-link-bracket-re . (2 1)))
                                  (const :tag "Clozify Org Emphases (independent)"
-                                        '(org-emph-re . (4)))
+                                        (org-emph-re . (4)))
                                  (const :tag "Clozify Org Emphases (by type)"
-                                        '(org-emph-re . (4 3)))
+                                        (org-emph-re . (4 3)))
                                  (cons :tag "Clozify Other"
                                        (choice :tag "Expression" regexp sexp)
                                        (choice :tag "Cloze Parameter Selectors"
