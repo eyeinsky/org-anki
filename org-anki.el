@@ -118,7 +118,7 @@ how to use it to include or skip an entry from being synced."
                  (const :tag "No" nil))
   :group 'org-anki)
 
-(defcustom org-anki-auto-cloze-regexps (list '(org-link-bracket-re . (2 1))
+(defcustom org-anki-cloze-regexps (list '(org-link-bracket-re . (2 1))
                                              '(org-emph-re (4)))
   ;; ((regexp . (answer-group id-group hint group)))
   "Alist of rules for generating cloze fields, or nil to disable.
