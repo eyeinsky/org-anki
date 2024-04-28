@@ -502,8 +502,11 @@ cloze fields."
 If org-anki-clozify-links is non-nil, consider org links in TEXT to be cloze fields."
   ;; Check for something similar to {{c1::Hidden-text::Hint}} in TEXT
   (if (or (string-match "{{c[0-9]+::\\(\n\\|.\\)*}}" text)
-	  (and org-anki-clozify-links
-	       (string-match org-link-bracket-re text)))
+	  (and org-anki-cloze-regexps
+	       (not (cl-every #'null
+                              (mapcar
+                               (lambda (regexp) (string-match (if regexp regexp "") text))
+                               (mapcar (lambda (rule) (eval (car rule))) org-anki-cloze-regexps))))))
       "Cloze"
     nil))
 
