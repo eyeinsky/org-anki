@@ -475,21 +475,22 @@ cloze fields."
   (let ((seen-ids '()))
     (mapc
      (lambda (rule)
-       (save-match-data
-         (setq string
+       (setq string
+             (save-match-data
                (replace-regexp-in-string
-                (car rule)
-                (let ((answer (match-string (nth 0 (cdr rule)) match))
-                      (id (match-string (nth 1 (cdr rule)) match))
-                      (hint (match-string (nth 2 (cdr rule)) match)))
-                  (add-to-list 'seen-ids id t)
-                  (with-output-to-string
-                    (princ (concat (format "{{c%d::%s"
-                                           (1+ (cl-position id seen-ids :text #'string=))
-                                           (or answer (match-string 0 match)))
-                                   (if hint
-                                       (format "::%s" hint))
-                                   "}}"))))
+                (eval (car rule))
+                (lambda (match)
+                  (let ((answer (match-string (or (nth 0 (cdr rule)) 0) match))
+                        (id (ignore-errors (match-string (nth 1 (cdr rule)) match)))
+                        (hint (ignore-errors (match-string (nth 2 (cdr rule)) match))))
+                    (add-to-list 'seen-ids id t)
+                    (with-output-to-string
+                      (princ (concat (format "{{c%d::%s"
+                                             (1+ (cl-position id seen-ids :test #'string=))
+                                             answer)
+                                     (if hint
+                                         (format "::%s" hint))
+                                     "}}")))))
                 string nil))))
      org-anki-cloze-regexps))
   string)
