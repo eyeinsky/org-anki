@@ -124,6 +124,48 @@ how to use it to include or skip an entry from being synced."
 		 (const :teg "No" nil))
   :group 'org-anki)
 
+(defcustom org-anki-auto-cloze-regexps (list '(org-link-bracket-re . (2 1))
+                                             '(org-emph-re (4)))
+  ;; ((regexp . (answer-group id-group hint group)))
+  "An alist of regexps and groups for generating cloze fields.
+
+Alist of the form ((REGEXP . (ANSWER-GROUP ID-GROUP
+HINT-GROUP))...) where REGEXP is a regex, or sexp which returns
+one, ANSWER-GROUP is the match group of REGEX corresponding to
+the cloze answer, ID-GROUP is the optional match group mapping to
+a cloze number (that is, cloze fields made from matches with the
+same ID-GROUP become cloze fields which are revealed at the same
+time), and HINT-GROUP is the optional match group which contains
+the contents of a cloze field hint. If no ANSWER-GROUP or no
+group indices at all are supplied, the entire match is used as
+the cloze answer.
+
+By default, when `anki-auto-clozify-regexps' is enabled, org links are
+made into cloze fields grouped by address and org emphases (areas
+surrounded by *, /, _, +) are made into un-grouped cloze fields."
+  :type '(choice :tag "Enabled"
+                 (const :tag "No")
+                 (repeat :tag "Yes, Rule List"
+                         (choice :tag "Rule"
+                                 (const :tag "Clozify Org Links"
+                                        '(org-link-bracket-re . (2 1)))
+                                 (const :tag "Clozify Org Emphases (independent)"
+                                        '(org-emph-re . (4)))
+                                 (const :tag "Clozify Org Emphases (by type)"
+                                        '(org-emph-re . (4 3)))
+                                 (cons :tag "Clozify Other"
+                                       (choice :tag "Expression" regexp sexp)
+                                       (choice :tag "Cloze Parameter Selectors"
+                                               (nil :tag "None (whole match as answer)")
+                                               (list :tag "Match Group Indices"
+                                                     (choice :tag "Answer Group"
+                                                             integer nil)
+                                                     (choice :tag "ID Group"
+                                                             integer nil)
+                                                     (choice :tag "Hint Group"
+                                                             integer nil)))))))
+  :group 'org-anki)
+
 ;; Stolen code
 
 ;; Get list of global properties
