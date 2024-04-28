@@ -118,12 +118,6 @@ how to use it to include or skip an entry from being synced."
                  (const :tag "No" nil))
   :group 'org-anki)
 
-(defcustom org-anki-clozify-links nil
-  "Convert org-links into cloze fields during the card sync process."
-  :type '(choice (const :tag "Yes" t)
-		 (const :teg "No" nil))
-  :group 'org-anki)
-
 (defcustom org-anki-auto-cloze-regexps (list '(org-link-bracket-re . (2 1))
                                              '(org-emph-re (4)))
   ;; ((regexp . (answer-group id-group hint group)))
@@ -499,7 +493,7 @@ cloze fields."
 
 (defun org-anki--is-cloze (text)
   "Check if TEXT has cloze syntax, return nil if not.
-If org-anki-clozify-links is non-nil, consider org links in TEXT to be cloze fields."
+If org-anki-cloze-regexps is non-nil, consider regexp matches in TEXT to be cloze fields."
   ;; Check for something similar to {{c1::Hidden-text::Hint}} in TEXT
   (if (or (string-match "{{c[0-9]+::\\(\n\\|.\\)*}}" text)
 	  (and org-anki-cloze-regexps
