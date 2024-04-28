@@ -118,7 +118,7 @@ how to use it to include or skip an entry from being synced."
                  (const :tag "No" nil))
   :group 'org-anki)
 
-(defcustom org-anki-cloze-regexps '((org-link-bracket-re 2 1)
+(defcustom org-anki-auto-cloze-rules '((org-link-bracket-re 2 1)
                                     (org-emph-re 4))
   "Alist of rules for generating cloze fields, or nil to disable.
 
@@ -418,11 +418,11 @@ be removed from the Anki app, return actions that do that."
 
 (defun org-anki--org-to-html (string)
   "Convert STRING (org element heading or content) to html.
-If `org-anki-cloze-regexps' is non-nil, convert org links to
+If `org-anki-auto-cloze-rules' is non-nil, convert org links to
 cloze fields."
   (save-excursion
     (org-anki--string-to-anki-mathjax
-     (org-export-string-as (org-anki--regexps-to-cloze string) 'html t '(:with-toc nil)))))
+     (org-export-string-as (org-anki--auto-cloze-string string) 'html t '(:with-toc nil)))))
 
 (defun org-anki--report-error (format &rest args)
   "FORMAT the ERROR and prefix it with `org-anki error'."
@@ -472,9 +472,9 @@ cloze fields."
          (org-entry-get nil "TAGS"))
        global-tags)) ":" t)))
 
-(defun org-anki--regexps-to-cloze (string)
+(defun org-anki--auto-cloze-string (string)
   "Turn regexp matches in STRING into cloze fields according to
-`org-anki-cloze-regexps'."
+`org-anki-auto-cloze-rules'."
   (let ((seen-ids '()))
     (mapc
      (lambda (rule)
@@ -495,21 +495,21 @@ cloze fields."
                                          (format "::%s" hint))
                                      "}}")))))
                 string nil))))
-     org-anki-cloze-regexps))
+     org-anki-auto-cloze-rules))
   string)
 
 ;;; Cloze
 
 (defun org-anki--is-cloze (text)
   "Check if TEXT has cloze syntax, return nil if not.
-If org-anki-cloze-regexps is non-nil, consider regexp matches in TEXT to be cloze fields."
+If org-anki-auto-cloze-rules is non-nil, consider regexp matches in TEXT to be cloze fields."
   ;; Check for something similar to {{c1::Hidden-text::Hint}} in TEXT
   (if (or (string-match "{{c[0-9]+::\\(\n\\|.\\)*}}" text)
-	  (and org-anki-cloze-regexps
+	  (and org-anki-auto-cloze-rules
 	       (not (cl-every #'null
                               (mapcar
                                (lambda (regexp) (string-match (if regexp regexp "") text))
-                               (mapcar (lambda (rule) (eval (car rule))) org-anki-cloze-regexps))))))
+                               (mapcar (lambda (rule) (eval (car rule))) org-anki-auto-cloze-rules))))))
       "Cloze"
     nil))
 

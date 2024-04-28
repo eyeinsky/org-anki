@@ -17,7 +17,7 @@ notes, with Cloze deletions generated for each link and emphases.
 Tags are also synchronized.
 
 See [[/example/example.org][example.org]] and the [[/example/][resulting screenshots]] for how the cards look
-after being synced to Anki (outdated, does not include Cloze-gen feature).
+after being synced to Anki (outdated, does not include auto-Cloze feature).
 
 ** Commands
 - =org-anki-sync-entry= :: adds or updates the current org-entry under
@@ -70,7 +70,7 @@ lose their scheduling information.
   ="Basic"=.
 - =org-anki-api-key= :: API key to authenticate to AnkiConnect. See
   https://foosoft.net/projects/anki-connect/#authentication for more.
-- =org-anki-cloze-regexps= :: set Cloze field generation rules. Default generates
+- =org-anki-auto-cloze-rules= :: set Cloze field generation rules. Default generates
   Cloze fields from links and emphases.
 ** Why
 .. as there are [[https://github.com/louietan/anki-editor][anki-editor]], [[https://github.com/abo-abo/pamparam][pamparam]], [[https://gitlab.com/phillord/org-drill][org-drill]], [[https://github.com/l3kn/org-fc][org-fc]]?
