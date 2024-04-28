@@ -1,3 +1,5 @@
+* v3.3.0
+- add command =org-anki-update-dir=
 * v3.1.0
 - add org entry content as =Extra= field to Cloze notes
 - support duplicate notes via customizable variable =org-anki-allow-duplicates=
