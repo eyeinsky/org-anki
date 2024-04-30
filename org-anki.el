@@ -51,8 +51,7 @@
 ;; Customizable variables
 
 (defcustom org-anki-default-deck nil
-  "Default deck name if none is set on the org item nor as global
-property"
+  "Default deck name if otherwise unset."
   :type '(string)
   :group 'org-anki)
 
@@ -90,7 +89,7 @@ Each one is a list, the first item is the model name and the rest are field name
   ;; See https://github.com/eyeinsky/org-anki/pull/58 for more.
 
 (defcustom org-anki-ankiconnnect-listen-address "http://127.0.0.1:8765"
-  "The address of AnkiConnect"
+  "The AnkiConnect listening address."
   :type '(string)
   :group 'org-anki)
 
@@ -107,7 +106,7 @@ See https://foosoft.net/projects/anki-connect/#authentication for more."
 
 (defcustom org-anki-skip-function nil
   "Function used to skip entries.
-Given as the SKIP argument to org-map-entries, see its help for
+Given as the SKIP argument to `org-map-entries', see its help for
 how to use it to include or skip an entry from being synced."
   :type '(function)
   :group 'org-anki)
@@ -142,11 +141,13 @@ Default NAME is \"PROPERTY\", default BUFFER the current buffer."
 ;; AnkiConnect API
 
 (defun org-anki-connect-request (body on-result on-error)
-  "Perform HTTP GET request to AnkiConnect, address is
-customizable by the org-anki-ankiconnnect-listen-address variable.
+  "Perform HTTP GET request to AnkiConnect.
+Address is customizable by the
+org-anki-ankiconnnect-listen-address variable.
 
-BODY is the alist json payload, CALLBACK the function to call
-with result."
+BODY is the alist json payload, ON-RESULT is the function to call
+with the result, and ON-ERROR a function called on errors."
+  ;; This docstring kinda sucks.
   (let ((json (json-encode
                `(("version" . 6)
                  ,@(if org-anki-api-key `(("key" . ,org-anki-api-key)))
@@ -177,6 +178,7 @@ with result."
            (funcall on-result the-result))))))))
 
 (defun org-anki--get-current-tags (ids)
+  "Retrieves tags of cards with IDS."
   ;; :: [Id] -> Promise [[Tag]]
   (promise-new
    (lambda (resolve reject)
@@ -195,6 +197,7 @@ with result."
 (cl-defstruct org-anki--note maybe-id fields tags deck type point)
 
 (defun org-anki--string-to-anki-mathjax (latex-code)
+  "Return LATEX-CODE as mathjax."
   ;; :: String -> String
   (--reduce-from
    (replace-regexp-in-string (regexp-quote (car it)) (cdr it) acc)
@@ -212,7 +215,7 @@ with result."
    fields))
 
 (defun org-anki--note-at-point ()
-  "Create an Anki note from whereever the cursor is"
+  "Create an Anki note from whereever the cursor is."
   ;; :: IO Note
   (-let*
       ((maybe-id (org-entry-get nil org-anki-prop-note-id))
@@ -233,8 +236,8 @@ with result."
      :point    note-start)))
 
 (defun org-anki--get-fields (type)
-  "Get note field values from entry at point."
-
+  "Get note field values from entry at point depending on TYPE."
+  ;; This docstring sucks
   ;; :: String -> IO [(Field, Value)]
   (let*
       ((fields (org-anki--get-model-fields type)) ; fields for TYPE
@@ -275,7 +278,7 @@ with result."
         (let ((missing-field (car (-difference fields found-fields))))
           `(,type ,@(plist-put found missing-field content))))
        (t (org-anki--report-error
-           "org-anki--get-fields: fields required: %s, fields found: %s, at character: %s"
+           "org-anki--get-fields: Fields required: %s, fields found: %s, at character: %s"
            fields found-fields (point)))))))
 
 ;;; JSON payloads
@@ -286,8 +289,7 @@ with result."
     ("params" . ,params)))
 
 (defun org-anki--create-note-single (note)
-  "Create an `addNote' json structure to be added to DECK with
-card FRONT and BACK strings."
+  "Create an `addNote' json structure for NOTE."
   (org-anki--body
    "addNote"
    `(("note" .
@@ -299,8 +301,7 @@ card FRONT and BACK strings."
          ("duplicateScope" . "deck"))))))))
 
 (defun org-anki--update-note-single (note)
-  "Create an `updateNoteFields' json structure with integer ID,
-and NEW-FRONT and NEW-BACK strings."
+  "Create an `updateNoteFields' json structure for NOTE."
   (org-anki--body
    "updateNoteFields"
    `(("note" .
@@ -308,8 +309,7 @@ and NEW-FRONT and NEW-BACK strings."
        ,@(org-anki--note-to-json note))))))
 
 (defun org-anki--tag-diff (current note)
-  "Calculate new tags that need to be added and tags that need to
-be removed from the Anki app, return actions that do that."
+  "Calculate add/remove-tags actions to sync NOTE with CURRENT."
   ;; :: [Tag] -> Note -> [Action]
   (let*
       ((new (org-anki--note-tags note))
@@ -321,6 +321,7 @@ be removed from the Anki app, return actions that do that."
             `(,(org-anki--add-tags (org-anki--note-maybe-id note) add))))))
 
 (defun org-anki--note-to-json (note)
+  "Return json form of NOTE data."
   ;; :: Note -> JSON
   `(("modelName" . ,(org-anki--note-type note))
     ("fields"    . ,(org-anki--note-fields note))))
@@ -372,24 +373,25 @@ be removed from the Anki app, return actions that do that."
      (org-export-string-as string 'html t '(:with-toc nil)))))
 
 (defun org-anki--report-error (format &rest args)
-  "FORMAT the ERROR and prefix it with `org-anki error'."
+  "FORMAT the ARGS and prefix them with `org-anki error: '."
   (let ((fmt (concat "org-anki error: " format)))
     (apply #'message fmt args)))
 
-(defun org-anki--report (format_ &rest args)
-  "FORMAT_ the ARGS and prefix it with `org-anki'."
-  (let* ((fmt (concat "org-anki: " format_)))
+(defun org-anki--report (format &rest args)
+  "FORMAT the ARGS and prefix them with `org-anki: '."
+  (let* ((fmt (concat "org-anki: " format)))
     (apply #'message fmt args)))
 
-(defun org-anki--debug (format_ &rest args)
-  "FORMAT_ the ARGS and prefix it with `org-anki'."
+(defun org-anki--debug (format &rest args)
+  "FORMAT the ARGS and prefix them with `org-anki'."
   (let* ((fmt (concat "org-anki debug: " format_)))
     (apply #'message fmt args)))
 
 (defun org-anki--no-action () (org-anki--report "No action taken."))
 
 (defun org-anki--find-prop (name default)
-  "Find property with NAME from
+  "Find property with NAME from context.
+The search order is:
 1. item,
 2. inherited from parents
 3. in-buffer setting
@@ -430,7 +432,7 @@ be removed from the Anki app, return actions that do that."
 
 ;; Stolen from https://github.com/louietan/anki-editor
 (defun org-anki--region-to-cloze (begin end arg hint)
-  "Cloze region from BEGIN to END with number ARG."
+  "Cloze region from BEGIN to END with number ARG and hint HINT."
   (let ((region (buffer-substring begin end)))
     (save-excursion
       (delete-region begin end)
@@ -442,7 +444,7 @@ be removed from the Anki app, return actions that do that."
 ;; Helpers
 
 (defun plist-to-assoc (plist)
-  "Convert property list into an association list"
+  "Convert property list into an association list."
   (let ((return nil))
     (while plist
       (-let (((k v . rest) plist))
@@ -615,7 +617,7 @@ be removed from the Anki app, return actions that do that."
   ;; :: String -> [FieldName]
   (let ((fields (cdr (assoc model org-anki-model-fields))))
     (unless fields
-      (error "No fields for '%s', please customize `org-anki-model-fields'."
+      (error "No fields for '%s', please customize `org-anki-model-fields'"
              model))
     fields))
 
@@ -650,7 +652,7 @@ be removed from the Anki app, return actions that do that."
 ;;;###autoload
 (defun org-anki-update-all (&optional buffer)
   ;; :: Maybe Buffer -> IO ()
-  "Updates all entries having ANKI_NOTE_ID property in BUFFER."
+  "Update all entries having ANKI_NOTE_ID property in BUFFER."
   (interactive)
   (with-current-buffer (or buffer (buffer-name))
     (org-anki--sync-notes
@@ -659,10 +661,9 @@ be removed from the Anki app, return actions that do that."
 ;;;###autoload
 (defun org-anki-update-dir (&optional prefix dir)
   ;; :: Maybe Buffer -> IO ()
-  "Updates all entries having ANKI_NOTE_ID property in every .org file in DIR.
+  "Update all entries having ANKI_NOTE_ID property in every .org file in DIR.
 
-If you also want to include its sub-directories, prefix the
-command by hitting `C-u' first."
+With PREFIX, include subdirectories."
   (interactive "P\nDChoose a directory: ")
   (let* ((org-regex "\\.org\\'")
          (files (if prefix (directory-files-recursively dir org-regex)
@@ -697,8 +698,9 @@ command by hitting `C-u' first."
 ;; Stolen from https://github.com/louietan/anki-editor
 ;;;###autoload
 (defun org-anki-cloze-dwim (&optional arg hint)
-  "Convert current active region or word under cursor to Cloze
-syntax."
+  "Convert current region or word at point to a Cloze field.
+
+Field will have number ARG and hint HINT."
   (interactive "p\nsHint (optional): ")
   (cond
    ((region-active-p)
@@ -710,7 +712,7 @@ syntax."
 
 ;;;###autoload
 (defun org-anki-browse-entry ()
-  "Browse entry at point on anki's browser dialog with searching nid"
+  "Browse entry at point on anki's browser dialog with searching nid."
   (interactive)
   (let ((maybe-id (org-entry-get nil org-anki-prop-note-id)))
     (cond
