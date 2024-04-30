@@ -74,45 +74,56 @@
   "Default fields for note types.
 
 Each one is a list, the first item is the model name and the rest are field names."
-  :type '(repeat (list (repeat string)))
+  :type '(repeat :tag "Types"
+                 (list (string :tag "Model Name")
+                       (repeat :tag "Field Names" string)))
   :group 'org-anki)
 
 (defcustom org-anki-field-templates nil
-  "Default templates for note fields."
-  :type '(alist
-          :key-type string
-          :value-type (alist
-                       :key-type string
-                       :value-type sexp))
+  "Templates for transforming certain note fields.
+This can be used, for example, to add backlinks to cards."
+  :type '(alist :tag "Model Name"
+          :key-type string :tag "Field Name"
+          :value-type (alist :tag "Formatting Function"
+                       :key-type string :tag "Format String" ;What is this, really???
+                       :value-type sexp :tag "Conversion Function"))
   :group 'org-anki)
   ;; The sexp value above should be a function from string to string,
   ;; See https://github.com/eyeinsky/org-anki/pull/58 for more.
 
 (defcustom org-anki-ankiconnnect-listen-address "http://127.0.0.1:8765"
   "The AnkiConnect listening address."
-  :type '(string)
+  :type '(string :tag "Address")
   :group 'org-anki)
 
 (defcustom org-anki-api-key nil
   "API key to authenticate to AnkiConnect.
-See https://foosoft.net/projects/anki-connect/#authentication for more."
+
+This AnkiConnect functionality is disabled by default.
+See https://foosoft.net/projects/anki-connect/#authentication for
+more."
   :type '(string)
   :group 'org-anki)
 
 (defcustom org-anki-inherit-tags t
-  "Inherit tags, set to nil to turn off."
-  :type 'boolean
+  "Tag inheritance for Anki notes. Set to nil to turn off.
+
+By default, org headings inherit tags from their parents. If this
+setting is t, the created Anki notes will have these inherited
+tags."
+  :type '(choice (const :tag "Inherit" t)
+                 (const :tag "Do Not Inherit" nil))
   :group 'org-anki)
 
 (defcustom org-anki-skip-function nil
   "Function used to skip entries.
-Given as the SKIP argument to `org-map-entries', see its help for
+Given as the SKIP argument to `org-map-entries'. See its help for
 how to use it to include or skip an entry from being synced."
   :type '(function)
   :group 'org-anki)
 
 (defcustom org-anki-allow-duplicates nil
-  "Allow duplicates."
+  "Allow duplicates."                   ;Duplicate Anki or Org notes? Both?
   :type '(choice (const :tag "Yes" t)
                  (const :tag "No" nil))
   :group 'org-anki)
