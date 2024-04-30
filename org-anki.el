@@ -52,17 +52,17 @@
 
 (defcustom org-anki-default-deck nil
   "Default deck name if otherwise unset."
-  :type '(string)
+  :type 'string
   :group 'org-anki)
 
 (defcustom org-anki-default-match nil
-  "Default match used in `org-map-entries` for sync all."
-  :type '(string)
+  "Default match used in `org-map-entries` for sync all." ;???
+  :type '(choice string (const :tag "nil" nil))           ;I have no idea what this option does.
   :group 'org-anki)
 
 (defcustom org-anki-default-note-type "Basic"
-  "Default note type."
-  :type '(string)
+  "Default note type if otherwise unset."
+  :type 'string
   :group 'org-anki)
 
 (defcustom org-anki-model-fields
@@ -71,7 +71,7 @@
     ("Basic (optional reversed card)" "Front" "Back")
     ("NameDescr" "Name" "Descr")
     ("Cloze" "Text" "Extra"))
-  "Default fields for note types.
+  "Model and field names for note types.
 
 Each one is a list, the first item is the model name and the rest are field names."
   :type '(repeat :tag "Types"
@@ -79,7 +79,7 @@ Each one is a list, the first item is the model name and the rest are field name
                        (repeat :tag "Field Names" string)))
   :group 'org-anki)
 
-(defcustom org-anki-field-templates nil
+(defcustom org-anki-field-templates (list) ;more "correct" I think?
   "Templates for transforming certain note fields.
 This can be used, for example, to add backlinks to cards."
   :type '(alist :tag "Model Name"
@@ -102,7 +102,7 @@ This can be used, for example, to add backlinks to cards."
 This AnkiConnect functionality is disabled by default.
 See https://foosoft.net/projects/anki-connect/#authentication for
 more."
-  :type '(string)
+  :type '(choice string (const :tag "Unset" nil))
   :group 'org-anki)
 
 (defcustom org-anki-inherit-tags t
@@ -119,7 +119,8 @@ tags."
   "Function used to skip entries.
 Given as the SKIP argument to `org-map-entries'. See its help for
 how to use it to include or skip an entry from being synced."
-  :type '(function)
+  :type '(sexp)                         ;any expression is allowed, see org-map-entries
+                                        ;documentation
   :group 'org-anki)
 
 (defcustom org-anki-allow-duplicates nil
