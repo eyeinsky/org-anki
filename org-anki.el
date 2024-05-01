@@ -91,7 +91,7 @@ This can be used, for example, to add backlinks to cards."
   ;; The sexp value above should be a function from string to string,
   ;; See https://github.com/eyeinsky/org-anki/pull/58 for more.
 
-(defcustom org-anki-ankiconnnect-listen-address "http://127.0.0.1:8765"
+(defcustom org-anki-ankiconnect-listen-address "http://127.0.0.1:8765"
   "The AnkiConnect listening address."
   :type '(string :tag "Address")
   :group 'org-anki)
@@ -155,7 +155,7 @@ Default NAME is \"PROPERTY\", default BUFFER the current buffer."
 (defun org-anki-connect-request (body on-result on-error)
   "Perform HTTP GET request to AnkiConnect.
 Address is customizable by the
-org-anki-ankiconnnect-listen-address variable.
+org-anki-ankiconnect-listen-address variable.
 
 BODY is the alist json payload, ON-RESULT is the function to call
 with the result, and ON-ERROR a function called on errors."
@@ -165,7 +165,7 @@ with the result, and ON-ERROR a function called on errors."
                  ,@(if org-anki-api-key `(("key" . ,org-anki-api-key)))
                  ,@body))))
     (request
-      org-anki-ankiconnnect-listen-address
+      org-anki-ankiconnect-listen-address
       :type "GET"
       :data json
       :headers '(("Content-Type" . "application/json"))
