@@ -50,18 +50,28 @@
 
 ;; Customizable variables
 
-(defcustom org-anki-default-deck nil
-  "Default deck name if otherwise unset."
+(defcustom org-anki-default-deck "Org Entries"
+  "Default deck name if otherwise unset.
+
+Deck names can also be set via the ANKI_DECK org property."
   :type 'string
   :group 'org-anki)
 
 (defcustom org-anki-default-match nil
-  "Default match used in `org-map-entries` for sync all." ;???
-  :type '(choice string (const :tag "nil" nil))           ;I have no idea what this option does.
+  "If non-nil, applies a default filter to `org-anki-sync-all'.
+
+Specifically, this string is used as the MATCH argument in the
+command's calls to `org-map-entries' if not set via the
+ANKI-MATCH org property."
+  :type '(choice string (const :tag "nil" nil))
   :group 'org-anki)
 
 (defcustom org-anki-default-note-type "Basic"
-  "Default note type if otherwise unset."
+  "Default note type if otherwise unset.
+
+Note types also can be set via the formatting of the
+note (Basic by default, Cloze if cloze formatting is detected) or
+via the ANKI_NOTE_TYPE org property."
   :type 'string
   :group 'org-anki)
 
