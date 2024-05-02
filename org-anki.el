@@ -48,6 +48,9 @@
 (defconst org-anki-note-type "ANKI_NOTE_TYPE")
 (defconst org-anki-prop-global-tags "ANKI_TAGS")
 
+;; Errors
+(define-error org-anki-error "Org Anki error")
+
 ;; Customizable variables
 
 (defcustom org-anki-default-deck nil
@@ -161,7 +164,7 @@ with result."
       :error
       (cl-function
        (lambda (&key error-thrown &allow-other-keys)
-         (org-anki--report-error
+         (error
           "Can't connect to Anki: is the application running and is AnkiConnect installed?\n\nGot error: %s"
           (cdr error-thrown))))
 
@@ -173,7 +176,7 @@ with result."
            (if the-error
                (if on-error
                    (funcall on-error the-error)
-                 (org-anki--report-error "Unhandled error: %s" the-error))
+                 (error "Unhandled error: %s" the-error))
            (funcall on-result the-result))))))))
 
 (defun org-anki--get-current-tags (ids)
@@ -274,7 +277,7 @@ with result."
        ((= fields-length (+ 1 found-length))
         (let ((missing-field (car (-difference fields found-fields))))
           `(,type ,@(plist-put found missing-field content))))
-       (t (org-anki--report-error
+       (t (error
            "org-anki--get-fields: fields required: %s, fields found: %s, at character: %s"
            fields found-fields (point)))))))
 
@@ -371,7 +374,8 @@ be removed from the Anki app, return actions that do that."
     (org-anki--string-to-anki-mathjax
      (org-export-string-as string 'html t '(:with-toc nil)))))
 
-(defun org-anki--report-error (format &rest args)
+(defun org-anki--report-error (format &rest args) ;this is not the correct way to signal errors, and
+                                        ;will not trigger debug if debug-on-error is set
   "FORMAT the ERROR and prefix it with `org-anki error'."
   (let ((fmt (concat "org-anki error: " format)))
     (apply #'message fmt args)))
@@ -401,7 +405,7 @@ be removed from the Anki app, return actions that do that."
      ((stringp prop-item) prop-item)
      ((stringp prop-global) prop-global)
      ((stringp default) default)
-     (t (error "No property '%s' in item nor file nor set as default!"
+     (t (error "No property '%s' in item, file or default"
                name)))))
 
 (defun org-anki--get-match ()
@@ -478,7 +482,7 @@ be removed from the Anki app, return actions that do that."
     (ignore &rest)
     (if error-msg
         ;; report error
-        (org-anki--report-error "Couldn't add note, received error: %s" error-msg)
+        (error "Couldn't add note, received error: %s" error-msg)
       (cond
        ;; added note
        ((equal "addNote" action-value)
@@ -521,7 +525,7 @@ be removed from the Anki app, return actions that do that."
             )
          (-map 'org-anki--handle-pair sorted)))
      (lambda (the-error)
-       (org-anki--report-error
+       (error
         "Couldn't update note, received: %s"
         the-error)))))
 
@@ -579,7 +583,7 @@ be removed from the Anki app, return actions that do that."
                        "note succesfully updated: %s"
                        (org-anki--note-maybe-id note)))
                     (lambda (the-error)
-                      (org-anki--report-error
+                      (error
                        "Couldn't update note, received: %s"
                        the-error)))
 
@@ -607,8 +611,8 @@ be removed from the Anki app, return actions that do that."
             (reverse notes))
            )
          (lambda (the-error)
-           (org-anki--report-error
-            "org-anki-delete-all error: %s"
+           (error
+            "Couldn't delete note, received error: %s"
             the-error))))))
 
 (defun org-anki--get-model-fields (model)
@@ -722,7 +726,7 @@ syntax."
        (lambda (_the-result)
          (org-anki--report "send request succesfully, please switch to anki"))
        (lambda (the-error)
-         (org-anki--report-error
+         (error
           "Browse error, received: %s"
           the-error)
          )))
@@ -827,9 +831,9 @@ Pandoc is required to be installed."
              (org-anki--write-note (org-anki--parse-note json name)))
            the-result))
         (lambda (the-error)
-          (org-anki--report-error "Get deck error, received: %s" the-error))))
+          (error "Get deck error, received: %s" the-error))))
      (lambda (the-error)
-       (org-anki--report-error "Get deck error, received: %s" the-error)))))
+       (error "Get deck error, received: %s" the-error)))))
 
 
 (provide 'org-anki)
