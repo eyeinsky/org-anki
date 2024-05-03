@@ -49,7 +49,11 @@
 (defconst org-anki-prop-global-tags "ANKI_TAGS")
 
 ;; Errors
-(define-error org-anki-error "Org Anki error")
+
+(define-error 'org-anki-error "Org-Anki error")
+(define-error 'org-anki-error-note-add "Could not add note" 'org-anki-error)
+(define-error 'org-anki-error-note-delete "Could not delete note" 'org-anki-error)
+(define-error 'org-anki-error-note-update "Could not update note" 'org-anki-error)
 
 ;; Customizable variables
 
@@ -176,7 +180,7 @@ with result."
            (if the-error
                (if on-error
                    (funcall on-error the-error)
-                 (error "Unhandled error: %s" the-error))
+                 (signal 'org-anki-error '(the-error)))
            (funcall on-result the-result))))))))
 
 (defun org-anki--get-current-tags (ids)
@@ -482,7 +486,7 @@ be removed from the Anki app, return actions that do that."
     (ignore &rest)
     (if error-msg
         ;; report error
-        (error "Couldn't add note, received error: %s" error-msg)
+        (signal 'org-anki-error-note-add '(error-msg))
       (cond
        ;; added note
        ((equal "addNote" action-value)
@@ -525,9 +529,7 @@ be removed from the Anki app, return actions that do that."
             )
          (-map 'org-anki--handle-pair sorted)))
      (lambda (the-error)
-       (error
-        "Couldn't update note, received: %s"
-        the-error)))))
+       (signal 'org-anki-error-note-update '(the-error))))))
 
 (defun org-anki--sync-notes (notes)
   ;; :: [Note] -> IO ()
@@ -583,9 +585,7 @@ be removed from the Anki app, return actions that do that."
                        "note succesfully updated: %s"
                        (org-anki--note-maybe-id note)))
                     (lambda (the-error)
-                      (error
-                       "Couldn't update note, received: %s"
-                       the-error)))
+                      (signal 'org-anki-error-note-update the-error)))
 
                    ;; Update tags (if any) for the single note, too:
                    (if notes-and-tag-actions2
@@ -611,9 +611,7 @@ be removed from the Anki app, return actions that do that."
             (reverse notes))
            )
          (lambda (the-error)
-           (error
-            "Couldn't delete note, received error: %s"
-            the-error))))))
+           (signal 'org-anki-error-note-delete '(the-error)))))))
 
 (defun org-anki--get-model-fields (model)
   ;; :: String -> [FieldName]
