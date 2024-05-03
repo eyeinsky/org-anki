@@ -378,12 +378,6 @@ be removed from the Anki app, return actions that do that."
     (org-anki--string-to-anki-mathjax
      (org-export-string-as string 'html t '(:with-toc nil)))))
 
-(defun org-anki--report-error (format &rest args) ;this is not the correct way to signal errors, and
-                                        ;will not trigger debug if debug-on-error is set
-  "FORMAT the ERROR and prefix it with `org-anki error'."
-  (let ((fmt (concat "org-anki error: " format)))
-    (apply #'message fmt args)))
-
 (defun org-anki--report (format_ &rest args)
   "FORMAT_ the ARGS and prefix it with `org-anki'."
   (let* ((fmt (concat "org-anki: " format_)))
