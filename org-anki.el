@@ -51,9 +51,12 @@
 ;; Errors
 
 (define-error 'org-anki-error "Org-Anki error")
-(define-error 'org-anki-error-note-add "Could not add note" 'org-anki-error)
-(define-error 'org-anki-error-note-delete "Could not delete note" 'org-anki-error)
-(define-error 'org-anki-error-note-update "Could not update note" 'org-anki-error)
+(define-error 'org-anki-bad-get "Bad GET" 'org-anki-error)
+(define-error 'org-anki-bad-get-connection
+              "Can't connect (is AnkiConnect running?)" 'org-anki-bad-get)
+(define-error 'org-anki-bad-get-add "Could not add note" 'org-anki-bad-get)
+(define-error 'org-anki-bad-get-delete "Could not delete note" 'org-anki-bad-get)
+(define-error 'org-anki-bad-get-update "Could not update note" 'org-anki-bad-get)
 
 ;; Customizable variables
 
@@ -168,9 +171,7 @@ with result."
       :error
       (cl-function
        (lambda (&key error-thrown &allow-other-keys)
-         (error
-          "Can't connect to Anki: is the application running and is AnkiConnect installed?\n\nGot error: %s"
-          (cdr error-thrown))))
+         (signal 'org-anki-bad-get-connection (list (cdr error-thrown)))))
 
       :success
       (cl-function
@@ -480,7 +481,7 @@ be removed from the Anki app, return actions that do that."
     (ignore &rest)
     (if error-msg
         ;; report error
-        (signal 'org-anki-error-note-add '(error-msg))
+        (signal 'org-anki-error-note-add (list error-msg))
       (cond
        ;; added note
        ((equal "addNote" action-value)
