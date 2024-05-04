@@ -715,7 +715,8 @@ With PREFIX, include subdirectories."
   ;; :: Maybe Buffer -> IO ()
   (interactive)
   (let* ((buffer-name_ (or buffer (buffer-name)))
-         (prompt (format "Are you sure you want to delete all notes in buffer '%s' from Anki?" buffer-name_)))
+         (prompt (format "Are you sure you want to delete all notes in buffer '%s' from Anki?"
+                         buffer-name_)))
     (if (y-or-n-p prompt)
         (with-current-buffer buffer-name_
           (org-anki--delete-notes_
