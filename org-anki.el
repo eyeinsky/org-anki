@@ -144,7 +144,7 @@ how to use it to include or skip an entry from being synced."
 ;; Get list of global properties
 ;;
 ;; From:
-;;   https://emacs.stackexchange.com/questions/21713/how-to-get-property-values-from-org-file-headers
+;; https://emacs.stackexchange.com/questions/21713/how-to-get-property-values-from-org-file-headers
 (defun org-anki--global-props (&optional name buffer)
   "Get the plists of global org properties by NAME in BUFFER.
 
@@ -185,7 +185,8 @@ with the result, and ON-ERROR a function called on errors."
       (cl-function
        (lambda (&key error-thrown &allow-other-keys)
          (org-anki--report-error
-          "Can't connect to Anki: is the application running and is AnkiConnect installed?\n\nGot error: %s"
+          "Can't connect to Anki: is the application running\
+ and is AnkiConnect installed?\n\nGot error: %s"
           (cdr error-thrown))))
 
       :success
@@ -197,7 +198,7 @@ with the result, and ON-ERROR a function called on errors."
                (if on-error
                    (funcall on-error the-error)
                  (org-anki--report-error "Unhandled error: %s" the-error))
-           (funcall on-result the-result))))))))
+             (funcall on-result the-result))))))))
 
 (defun org-anki--get-current-tags (ids)
   "Retrieves tags of cards with IDS."
@@ -441,7 +442,8 @@ The search order is:
        (if org-anki-inherit-tags
            (substring-no-properties (or (org-entry-get nil "ALLTAGS") ""))
          (org-entry-get nil "TAGS"))
-       global-tags)) ":" t)))
+       global-tags))
+    ":" t)))
 
 ;;; Cloze
 
@@ -569,8 +571,10 @@ The search order is:
                      (t                              (cons :left note))))
                   notes))
                 ((new . existing) new-and-existing) ;; [Note]
-                (additions (--map (cons it (org-anki--create-note-single it)) new))      ;; [(Note, Action)]
-                (updates   (--map (cons it (org-anki--update-note-single it)) existing)) ;; [(Note, Action)]
+                (additions (--map (cons it (org-anki--create-note-single it)) new))
+                ;; [(Note, Action)]
+                (updates   (--map (cons it (org-anki--update-note-single it)) existing))
+                ;; [(Note, Action)]
 
                 ;; Calculate added and removed tags
                 (notes-and-tag-actions ;; [(Note, [Action])]
@@ -612,7 +616,8 @@ The search order is:
                        (org-anki--execute-api-actions notes-and-tag-actions2)))
 
                ;; It's not just one updated note, default to multi
-               (let ((note-action-pairs (-concat additions updates notes-and-tag-actions2))) ;; [(Note, Action)]
+               (let ((note-action-pairs (-concat additions updates notes-and-tag-actions2)))
+                 ;; [(Note, Action)]
                  (org-anki--execute-api-actions note-action-pairs))))))
         (promise-catch (lambda (reason) (error reason))))))
 
