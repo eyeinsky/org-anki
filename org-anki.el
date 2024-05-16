@@ -105,6 +105,11 @@ See https://foosoft.net/projects/anki-connect/#authentication for more."
   :type 'boolean
   :group 'org-anki)
 
+(defcustom org-anki-ignored-tags nil
+  "Tags that are always ignored when syncing to Anki."
+  :type '(repeat string)
+  :group 'org-anki)
+
 (defcustom org-anki-skip-function nil
   "Function used to skip entries.
 Given as the SKIP argument to org-map-entries, see its help for
@@ -410,14 +415,17 @@ be removed from the Anki app, return actions that do that."
     (if (stringp file-global) file-global org-anki-default-match)))
 
 (defun org-anki--get-tags ()
-  (delete-dups
-   (split-string
-    (let ((global-tags (org-anki--get-global-prop org-anki-prop-global-tags)))
-      (concat
-       (if org-anki-inherit-tags
-           (substring-no-properties (or (org-entry-get nil "ALLTAGS") ""))
-         (org-entry-get nil "TAGS"))
-       global-tags)) ":" t)))
+  (cl-delete-if
+   (lambda (tag) (member tag org-anki-ignored-tags))
+   (delete-dups
+    (split-string
+     (let ((global-tags (org-anki--get-global-prop org-anki-prop-global-tags)))
+       (concat
+        (if org-anki-inherit-tags
+            (substring-no-properties (or (org-entry-get nil "ALLTAGS") ""))
+          (org-entry-get nil "TAGS"))
+        global-tags))
+     ":" t))))
 
 ;;; Cloze
 
