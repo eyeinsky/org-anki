@@ -3,7 +3,7 @@
 ;; Copyright (C) 2020 Markus Läll
 ;;
 ;; URL: https://github.com/eyeinsky/org-anki
-;; Version: 3.3.1
+;; Version: 3.3.2
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
 ;; Package-Requires: ((emacs "27.1") (request "0.3.2") (dash "2.17") (promise "1.1"))
@@ -415,6 +415,8 @@ be removed from the Anki app, return actions that do that."
     (if (stringp file-global) file-global org-anki-default-match)))
 
 (defun org-anki--get-tags ()
+  ;; :: IO [Tag]
+  "Get list of tags for org entry at point; filter out ignored tags."
   (cl-delete-if
    (lambda (tag) (member tag org-anki-ignored-tags))
    (delete-dups
