@@ -3,7 +3,7 @@
 ;; Copyright (C) 2020 Markus Läll
 ;;
 ;; URL: https://github.com/eyeinsky/org-anki
-;; Version: 3.3.0
+;; Version: 3.3.1
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
 ;; Package-Requires: ((emacs "27.1") (request "0.3.2") (dash "2.17") (promise "1.1"))
@@ -619,6 +619,11 @@ be removed from the Anki app, return actions that do that."
              model))
     fields))
 
+(defun org-anki--note-complete (note)
+  ;; :: Note -> Bool
+  "Test if all fields of a NOTE have values (i.e, are not nil)"
+  (equal nil (rassq "" (org-anki--note-fields note))))
+
 ;; Public API
 
 ;;; Convenience functions
@@ -645,7 +650,10 @@ be removed from the Anki app, return actions that do that."
   (interactive)
   (with-current-buffer (or buffer (buffer-name))
     (org-anki--sync-notes
-     (org-map-entries 'org-anki--note-at-point (org-anki--get-match) nil org-anki-skip-function))))
+     (-filter
+      'org-anki--note-complete
+      (org-map-entries
+       'org-anki--note-at-point (org-anki--get-match) nil org-anki-skip-function)))))
 
 ;;;###autoload
 (defun org-anki-update-all (&optional buffer)
