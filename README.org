@@ -9,15 +9,15 @@ converting html to org).
 ** How
 Creates "Basic" or "Cloze" type notes.
 
-By default "Basic" cards are created where org entry's heading is the
-card front and content is the back.[fn:how] If the heading has Cloze
-syntax (={{...}}=) then the heading is used to create both the
-question and the answer, and content of the org entry is not used.
+By default org entries without links or emphases are turned into “Basic” Anki
+notes, with the heading as the front and the content as the back[fn:how], while
+entries with Cloze syntax (={{...}}=), links, or emphases are turned into “Cloze”
+notes, with Cloze deletions generated for each link and emphases.
 
 Tags are also synchronized.
 
 See [[/example/example.org][example.org]] and the [[/example/][resulting screenshots]] for how the cards look
-after being synced to Anki.
+after being synced to Anki (outdated, does not include auto-Cloze feature).
 
 ** Commands
 - =org-anki-sync-entry= :: adds or updates the current org-entry under
@@ -68,8 +68,10 @@ lose their scheduling information.
   this to =nil= to turn it off.
 - =org-anki-default-note-type= :: set note type. By default this is
   ="Basic"=.
-- =org-anki-api-key= :: API key to authenticate to AnkiConnect. See https://foosoft.net/projects/anki-connect/#authentication for more.
-
+- =org-anki-api-key= :: API key to authenticate to AnkiConnect. See
+  https://foosoft.net/projects/anki-connect/#authentication for more.
+- =org-anki-auto-cloze-rules= :: set Cloze field generation rules. Default generates
+  Cloze fields from links and emphases.
 ** Why
 .. as there are [[https://github.com/louietan/anki-editor][anki-editor]], [[https://github.com/abo-abo/pamparam][pamparam]], [[https://gitlab.com/phillord/org-drill][org-drill]], [[https://github.com/l3kn/org-fc][org-fc]]?
 

@@ -123,6 +123,57 @@ how to use it to include or skip an entry from being synced."
                  (const :tag "No" nil))
   :group 'org-anki)
 
+(defcustom org-anki-auto-cloze-rules '((org-link-bracket-re 2 1)
+                                    (org-emph-re 4))
+  "Alist of rules for generating cloze fields, or nil to disable.
+
+Alist of the form ((REGEXP . (ANSWER-GROUP ID-GROUP
+HINT-GROUP))...) where REGEXP is a regex, or sexp which returns
+one, ANSWER-GROUP is the match group of REGEX corresponding to
+the cloze answer, ID-GROUP is the optional match group mapping to
+a cloze number (that is, cloze fields made from matches with the
+same ID-GROUP become cloze fields which are revealed at the same
+time), and HINT-GROUP is the optional match group which contains
+the contents of a cloze field hint. If no ANSWER-GROUP or no
+group indices at all are supplied, the entire match is used as
+the cloze answer.
+
+Rules are used to generate org fields in the order they are
+specified, from the input org text.
+
+By default, org links are made into cloze fields grouped by
+address and org emphases (areas surrounded by *, /, _, +) are
+made into un-grouped cloze fields."
+  :type '(choice
+          :tag "Enabled"
+          (const :tag "No" nil)
+          (repeat
+           :tag "Yes, Rule List"
+           (choice
+            :tag "Rule"
+            (const :tag "Clozify Org Links"
+                   (org-link-bracket-re . (2 1)))
+            (const :tag "Clozify Org Emphases (independent)"
+                   (org-emph-re . (4)))
+            (const :tag "Clozify Org Emphases (by type)"
+                   (org-emph-re . (4 3)))
+            (cons :tag "Clozify Other"
+                  (choice :tag "Expression" regexp sexp)
+                  (choice :tag "Cloze Parameter Selectors"
+                          (const :tag "None (whole match as answer)" nil)
+                          (list :tag "Match Group Indices"
+                                (choice :tag "Answer Group"
+                                        (integer :tag "is index")
+                                        (const :tag "None (whole match as answer)" nil))
+                                (choice :tag "ID Group"
+                                        (const :tag "None (independent)" nil)
+                                        (integer :tag "is index"))
+                                (choice :tag "Hint Group"
+                                        (const :tag "None (no hints)" nil)
+                                        (integer :tag "is index")))))))
+          (sexp :tag "Yes, Sexp"))
+  :group 'org-anki)
+
 ;; Stolen code
 
 ;; Get list of global properties
@@ -371,10 +422,12 @@ be removed from the Anki app, return actions that do that."
     (substring-no-properties str 0 (length str))))
 
 (defun org-anki--org-to-html (string)
-  "Convert STRING (org element heading or content) to html."
+  "Convert STRING (org element heading or content) to html.
+If `org-anki-auto-cloze-rules' is non-nil, convert org links to
+cloze fields."
   (save-excursion
     (org-anki--string-to-anki-mathjax
-     (org-export-string-as string 'html t '(:with-toc nil)))))
+     (org-export-string-as (org-anki--auto-cloze-string string) 'html t '(:with-toc nil)))))
 
 (defun org-anki--report-error (format &rest args)
   "FORMAT the ERROR and prefix it with `org-anki error'."
@@ -429,12 +482,44 @@ be removed from the Anki app, return actions that do that."
         global-tags))
      ":" t))))
 
+(defun org-anki--auto-cloze-string (string)
+  "Turn regexp matches in STRING into cloze fields according to
+`org-anki-auto-cloze-rules'."
+  (let ((seen-ids '()))
+    (mapc
+     (lambda (rule)
+       (setq string
+             (save-match-data
+               (replace-regexp-in-string
+                (eval (car rule))
+                (lambda (match)
+                  (let ((answer (match-string (or (nth 0 (cdr rule)) 0) match))
+                        (id (ignore-errors (match-string (nth 1 (cdr rule)) match)))
+                        (hint (ignore-errors (match-string (nth 2 (cdr rule)) match))))
+                    (add-to-list 'seen-ids id t)
+                    (with-output-to-string
+                      (princ (concat (format "{{c%d::%s"
+                                             (1+ (cl-position id seen-ids :test #'string=))
+                                             answer)
+                                     (if hint
+                                         (format "::%s" hint))
+                                     "}}")))))
+                string nil))))
+     org-anki-auto-cloze-rules))
+  string)
+
 ;;; Cloze
 
 (defun org-anki--is-cloze (text)
-  "Check if TEXT has cloze syntax, return nil if not."
+  "Check if TEXT has cloze syntax, return nil if not.
+If org-anki-auto-cloze-rules is non-nil, consider regexp matches in TEXT to be cloze fields."
   ;; Check for something similar to {{c1::Hidden-text::Hint}} in TEXT
-  (if (string-match "{{c[0-9]+::\\(\n\\|.\\)*}}" text)
+  (if (or (string-match "{{c[0-9]+::\\(\n\\|.\\)*}}" text)
+	  (and org-anki-auto-cloze-rules
+	       (not (cl-every #'null
+                              (mapcar
+                               (lambda (regexp) (string-match (if regexp regexp "") text))
+                               (mapcar (lambda (rule) (eval (car rule))) org-anki-auto-cloze-rules))))))
       "Cloze"
     nil))
 
