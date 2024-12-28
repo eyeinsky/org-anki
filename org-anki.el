@@ -36,6 +36,7 @@
 (require 'json)
 (require 'org)
 (require 'org-element)
+(require 'org-ml)
 (require 'promise)
 (require 'request)
 (require 'thunk)
@@ -122,6 +123,12 @@ how to use it to include or skip an entry from being synced."
   :type '(choice (const :tag "Yes" t)
                  (const :tag "No" nil))
   :group 'org-anki)
+
+(defcustom org-anki-media-dir nil
+  "Path to Anki's media collection, set to nil to turn off copying media."
+  :type '(string)
+  :group 'org-anki)
+
 
 ;; Stolen code
 
@@ -229,6 +236,8 @@ with result."
        (deck (org-anki--find-prop org-anki-prop-deck org-anki-default-deck))
        (note-start (point)))
 
+    (print fields)
+
     (make-org-anki--note
      :maybe-id (if (stringp maybe-id) (string-to-number maybe-id))
      :fields   (org-anki--apply-templates fields templates)
@@ -246,7 +255,7 @@ with result."
        (found nil) ; init property list from field to value
        (found-fields nil) ; init list for found fields
        (level (+ 1 (org-current-level)))) ; subentry level
-    (org-map-entries ; try to find fields from subheadings
+    (org-map-entries ; iterate sub-entries within current org entry
      (lambda ()
        (let ((title (org-entry-get nil "ITEM")))
          (if (and (= level (org-current-level)) (member title fields))
@@ -633,6 +642,12 @@ be removed from the Anki app, return actions that do that."
   ;; :: Note -> Bool
   "Test if all fields of a NOTE have values (i.e, are not nil)"
   (equal nil (rassq "" (org-anki--note-fields note))))
+
+;; Media
+
+(defun org-anki--copy-files ()
+
+  )
 
 ;; Public API
 
