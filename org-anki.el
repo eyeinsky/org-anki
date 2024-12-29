@@ -645,9 +645,54 @@ be removed from the Anki app, return actions that do that."
 
 ;; Media
 
-(defun org-anki--copy-files ()
+(defun org-anki--entry-file-links (parsed-subtree)
+  ;; Subtree -> Set FilePath
+  (->> parsed-subtree
+       (org-ml-match '(:any * link))
+       (--filter (string= (org-ml-get-property :type it) "file"))
+       (--map (org-ml-get-property :path it))
+       (--reduce-from (if (member it acc) acc (cons it acc)) nil)
+       )
+  )
+
+(defun org-anki--create-replace-mapping (file-links)
+  ;; :: [FilePath] ->
+  (->> file-links
+       (--map (cons it (concat org-anki-media-dir "/" (file-name-nondirectory it))))
+       ))
+
+;; (defun org-anki--copy-files ()
+;;   ;; IO ()
+;;   (->> (org-anki--entry-file-links)
+;;        (--map (copy-file it (concat org-anki-media-dir "/" (file-name-nondirectory it)) t)))
+;;   )
+
+;; (defun org-anki--fix-links (string)
+;;   ;; String -> String
+;;   )
+
+
+(defun org-anki-hot ()
+  (let*
+      (
+       (string (org-anki--entry-content-until-any-heading))
+       (parsed-subtree (org-ml-from-string 'headline string))
+       (file-links (org-anki--entry-file-links parsed-subtree))
+       (replace-map (org-anki--create-replace-mapping file-links))
+       (string-new (--reduce-from (.. replace car with cdr in acc ..) string replace-map))
+       (res replace-map)
+       )
+    ;; (print string)
+    (print "start")
+    (print res)
+    (print "end")
+    nil
+      )
+  ;; (org-anki--create-replace-mapping )
+
 
   )
+
 
 ;; Public API
 
