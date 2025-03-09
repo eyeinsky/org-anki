@@ -14,7 +14,9 @@ card front and content is the back.[fn:how] If the heading has Cloze
 syntax (={{...}}=) then the heading is used to create both the
 question and the answer, and content of the org entry is not used.
 
-Tags are also synchronized.
+Tags are also synchronized; hierarchical tags can be treated by customizing
+=org-anki-treat-hierarchical-tags= with a string such as =__= that is used in
+the org-file to represent Anki's separator =::= for hierarchical tags.
 
 See [[/example/example.org][example.org]] and the [[/example/][resulting screenshots]] for how the cards look
 after being synced to Anki.

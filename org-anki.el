@@ -110,6 +110,14 @@ See https://foosoft.net/projects/anki-connect/#authentication for more."
   :type '(repeat string)
   :group 'org-anki)
 
+(defcustom org-anki-treat-hierarchical-tags nil
+  "Set this to a string (e.g., a double under-bar) that is used in your org file to
+represent the separator '::' used in Anki's hierarchical tags. If such a string is set,
+it is replaced in org tags with '::' to Anki. Conversely, when importing an Anki deck,
+'::' is replaced with the configured string."
+  :type '(string)
+  :group 'org-anki)
+
 (defcustom org-anki-skip-function nil
   "Function used to skip entries.
 Given as the SKIP argument to org-map-entries, see its help for
@@ -419,15 +427,20 @@ be removed from the Anki app, return actions that do that."
   "Get list of tags for org entry at point; filter out ignored tags."
   (cl-delete-if
    (lambda (tag) (member tag org-anki-ignored-tags))
-   (delete-dups
-    (split-string
-     (let ((global-tags (org-anki--get-global-prop org-anki-prop-global-tags)))
-       (concat
-        (if org-anki-inherit-tags
-            (substring-no-properties (or (org-entry-get nil "ALLTAGS") ""))
-          (org-entry-get nil "TAGS"))
-        global-tags))
-     ":" t))))
+   (let ((tags (delete-dups
+                (split-string
+                 (let ((global-tags (org-anki--get-global-prop org-anki-prop-global-tags)))
+                   (concat
+                    (if org-anki-inherit-tags
+                        (substring-no-properties (or (org-entry-get nil "ALLTAGS") ""))
+                      (org-entry-get nil "TAGS"))
+                    global-tags))
+                 ":" t))))
+     (if org-anki-treat-hierarchical-tags
+         (mapcar (lambda (tag)
+                   (replace-string org-anki-treat-hierarchical-tags "::" tag))
+                 tags)
+       tags))))
 
 ;;; Cloze
 
@@ -790,7 +803,13 @@ syntax."
 (defun org-anki--write-note-properties (note)
   ;; Add tags if any
   (let ((tags (org-anki--note-tags note)))
-    (if tags (insert (concat " :" (mapconcat 'identity tags ":") ":"))))
+    (if tags
+        (let ((processed-tags (if org-anki-treat-hierarchical-tags
+                                  (mapcar (lambda (tag)
+                                            (replace-string "::" org-anki-treat-hierarchical-tags tag))
+                                          tags)
+                                tags)))
+          (insert (concat " :" (mapconcat 'identity processed-tags ":") ":")))))
   (insert "\n") ; Newline is required to add properties to org entry
   ;; Add ANKI_NOTE_ID
   (org-entry-put nil org-anki-prop-note-id (number-to-string (org-anki--note-maybe-id note)))
