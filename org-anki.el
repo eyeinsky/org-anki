@@ -3,7 +3,7 @@
 ;; Copyright (C) 2020 Markus Läll
 ;;
 ;; URL: https://github.com/eyeinsky/org-anki
-;; Version: 3.3.2
+;; Version: 3.4.0
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
 ;; Package-Requires: ((emacs "27.1") (request "0.3.2") (dash "2.17") (promise "1.1"))
@@ -108,6 +108,15 @@ See https://foosoft.net/projects/anki-connect/#authentication for more."
 (defcustom org-anki-ignored-tags nil
   "Tags that are always ignored when syncing to Anki."
   :type '(repeat string)
+  :group 'org-anki)
+
+(defcustom org-anki-hierarchical-tags-separator nil
+  "Set huerarchical tags separator.
+Set this to a string (e.g., a double under-bar) that is used in
+your org file to represent the separator '::' (otherwise not
+allowed in a tag name in org-mode) used in Anki's hierarchical
+tags."
+  :type '(string)
   :group 'org-anki)
 
 (defcustom org-anki-skip-function nil
@@ -419,15 +428,20 @@ be removed from the Anki app, return actions that do that."
   "Get list of tags for org entry at point; filter out ignored tags."
   (cl-delete-if
    (lambda (tag) (member tag org-anki-ignored-tags))
-   (delete-dups
-    (split-string
-     (let ((global-tags (org-anki--get-global-prop org-anki-prop-global-tags)))
-       (concat
-        (if org-anki-inherit-tags
-            (substring-no-properties (or (org-entry-get nil "ALLTAGS") ""))
-          (org-entry-get nil "TAGS"))
-        global-tags))
-     ":" t))))
+   (let ((tags (delete-dups
+                (split-string
+                 (let ((global-tags (org-anki--get-global-prop org-anki-prop-global-tags)))
+                   (concat
+                    (if org-anki-inherit-tags
+                        (substring-no-properties (or (org-entry-get nil "ALLTAGS") ""))
+                      (org-entry-get nil "TAGS"))
+                    global-tags))
+                 ":" t))))
+     (if org-anki-hierarchical-tags-separator
+         (mapcar (lambda (tag)
+                   (replace-regexp-in-string org-anki-hierarchical-tags-separator "::" tag))
+                 tags)
+       tags))))
 
 ;;; Cloze
 
@@ -790,7 +804,13 @@ syntax."
 (defun org-anki--write-note-properties (note)
   ;; Add tags if any
   (let ((tags (org-anki--note-tags note)))
-    (if tags (insert (concat " :" (mapconcat 'identity tags ":") ":"))))
+    (if tags
+        (let ((processed-tags (if org-anki-hierarchical-tags-separator
+                                  (mapcar (lambda (tag)
+                                            (replace-regexp-in-string "::" org-anki-hierarchical-tags-separator tag))
+                                          tags)
+                                tags)))
+          (insert (concat " :" (mapconcat 'identity processed-tags ":") ":")))))
   (insert "\n") ; Newline is required to add properties to org entry
   ;; Add ANKI_NOTE_ID
   (org-entry-put nil org-anki-prop-note-id (number-to-string (org-anki--note-maybe-id note)))
