@@ -438,7 +438,7 @@ be removed from the Anki app, return actions that do that."
                  ":" t))))
      (if org-anki-treat-hierarchical-tags
          (mapcar (lambda (tag)
-                   (replace-string org-anki-treat-hierarchical-tags "::" tag))
+                   (replace-regexp-in-string org-anki-treat-hierarchical-tags "::" tag))
                  tags)
        tags))))
 
@@ -806,7 +806,7 @@ syntax."
     (if tags
         (let ((processed-tags (if org-anki-treat-hierarchical-tags
                                   (mapcar (lambda (tag)
-                                            (replace-string "::" org-anki-treat-hierarchical-tags tag))
+                                            (replace-regexp-in-string "::" org-anki-treat-hierarchical-tags tag))
                                           tags)
                                 tags)))
           (insert (concat " :" (mapconcat 'identity processed-tags ":") ":")))))
