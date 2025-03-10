@@ -3,7 +3,7 @@
 ;; Copyright (C) 2020 Markus Läll
 ;;
 ;; URL: https://github.com/eyeinsky/org-anki
-;; Version: 3.4.0
+;; Version: 3.5.0
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
 ;; Package-Requires: ((emacs "27.1") (request "0.3.2") (dash "2.17") (promise "1.1"))
@@ -39,6 +39,8 @@
 (require 'promise)
 (require 'request)
 (require 'thunk)
+(require 'sha1)
+(require 'base64)
 
 ;; Constants
 
@@ -130,6 +132,14 @@ how to use it to include or skip an entry from being synced."
   "Allow duplicates."
   :type '(choice (const :tag "Yes" t)
                  (const :tag "No" nil))
+  :group 'org-anki)
+
+
+(defcustom org-anki-upload-images nil
+  "When set to true, images linked in the org-mode text as [[file:<file-path>]]
+are uploaded to Anki. As filename, the SHA1-hash of the image is used and the
+file-path is adjusted accordingly."
+  :type 'boolean
   :group 'org-anki)
 
 ;; Stolen code
@@ -224,6 +234,50 @@ with result."
            ((_ . fn) (assoc field-name templates)))
      (if fn (cons field-name (funcall fn field-value)) (cons field-name field-value)))
    fields))
+
+(defun org-anki--collect-file-links (content)
+  "Find image links of form [[file:<file-path>]] and derive hash-based filename.
+Returns a list of pairs of found file-paths and replacements."
+  (let ((regex "\\[\\[file:\\([^]]+\\)\\]\\]"))
+    (let (file-pairs)
+      (with-temp-buffer
+        (insert content)
+        (goto-char (point-min))
+        (while (re-search-forward regex nil t)
+          (let* ((file-path (match-string 1))
+                 (file-contents (with-temp-buffer
+                                  (insert-file-contents file-path)
+                                  (buffer-string)))
+                 (file-hash (sha1 file-contents))
+                 (file-ext (file-name-extension file-path t))
+                 (new-filename (concat file-hash file-ext)))
+	    (org-anki--debug "Found link: %s" file-path)
+            (org-anki--debug "Replacement filename: %s" new-filename)
+            (push (cons file-path new-filename) file-pairs))))
+      file-pairs)))
+
+(defun org-anki--process-file-links (content)
+  "Find image links in CONTENT, replacing them with hashed filenames and uploading the images to Anki."
+  (let ((file-pairs (org-anki--collect-file-links content)))
+    (dolist (pair file-pairs)
+      (let* ((file-path (car pair))
+             (new-filename (cdr pair))
+             (file-contents (with-temp-buffer
+                              (insert-file-contents file-path)
+                              (buffer-string)))
+             (base64-data (base64-encode-string file-contents t)))
+        (org-anki-connect-request
+         (org-anki--body
+          "storeMediaFile"
+          `(("filename" . ,new-filename)
+            ("data" . ,base64-data)))
+         (lambda (_result) (org-anki--report "File uploaded: %s" new-filename))
+         (lambda (error) (org-anki--report-error "File upload error: %s" error)))
+        ;; Replace the link in content
+        (setq content (string-replace (format "[[file:%s]]" file-path)
+                                      (format "[[file:%s]]" new-filename)
+                                      content)))))
+  content)
 
 (defun org-anki--note-at-point ()
   "Create an Anki note from whereever the cursor is"
@@ -382,6 +436,8 @@ be removed from the Anki app, return actions that do that."
 (defun org-anki--org-to-html (string)
   "Convert STRING (org element heading or content) to html."
   (save-excursion
+    (when org-anki-upload-images
+      (setq string (org-anki--process-file-links string)))
     (org-anki--string-to-anki-mathjax
      (org-export-string-as string 'html t '(:with-toc nil)))))
 
