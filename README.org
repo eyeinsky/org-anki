@@ -72,6 +72,8 @@ lose their scheduling information.
 - =org-anki-default-note-type= :: set note type. By default this is
   ="Basic"=.
 - =org-anki-api-key= :: API key to authenticate to AnkiConnect. See https://foosoft.net/projects/anki-connect/#authentication for more.
+- =org-anki-upload-images= :: set to =t= to sync file content from
+  file links to Anki as well. Default is =nil=.
 
 ** Why
 .. as there are [[https://github.com/louietan/anki-editor][anki-editor]], [[https://github.com/abo-abo/pamparam][pamparam]], [[https://gitlab.com/phillord/org-drill][org-drill]], [[https://github.com/l3kn/org-fc][org-fc]]?
