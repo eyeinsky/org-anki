@@ -783,8 +783,15 @@ syntax."
   (if html
       (replace-regexp-in-string
        "\n+$" ""
-       (shell-command-to-string
-        (format "pandoc --wrap=none --from=html --to=org <<< %s" (shell-quote-argument html))))
+       (if (eq system-type 'windows-nt)
+           (let ((temp-file (make-temp-file "org-anki-html-" nil ".html")))
+             (with-temp-file temp-file
+               (insert html))
+             (prog1
+                 (shell-command-to-string (format "pandoc --wrap=none --from=html --to=org -i %s" temp-file))
+               (delete-file temp-file))))
+         (shell-command-to-string
+          (format "pandoc --wrap=none --from=html --to=org <<< %s" (shell-quote-argument html))))
     ""))
 
 (defun org-anki--write-note-properties (note)
