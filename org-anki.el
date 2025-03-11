@@ -123,6 +123,11 @@ how to use it to include or skip an entry from being synced."
                  (const :tag "No" nil))
   :group 'org-anki)
 
+(defcustom org-anki-html-to-org 'org-anki--html-to-org
+  "Function used to convert HTML (string) to org syntax (string)."
+  :type '(function)
+  :group 'org-anki)
+
 ;; Stolen code
 
 ;; Get list of global properties
@@ -761,7 +766,7 @@ syntax."
           (format
            "%s"
            (org-anki--get-json-field-value (intern it) fields-json))))
-    (cons it (org-anki--html-to-org value-html)))
+    (cons it (funcall org-anki-html-to-org value-html)))
    model-fields))
 
 (defun org-anki--parse-note (note-json deck-name)
@@ -785,6 +790,18 @@ syntax."
        "\n+$" ""
        (shell-command-to-string
         (format "pandoc --wrap=none --from=html --to=org <<< %s" (shell-quote-argument html))))
+    ""))
+
+(defun org-anki--html-to-org-via-tempfile (html)
+  (if html
+      (replace-regexp-in-string
+       "\n+$" ""
+       (let ((temp-file (make-temp-file "org-anki-html-" nil ".html")))
+         (with-temp-file temp-file
+           (insert html))
+         (prog1
+             (shell-command-to-string (format "pandoc --wrap=none --from=html --to=org -i %s" temp-file))
+           (delete-file temp-file))))
     ""))
 
 (defun org-anki--write-note-properties (note)
