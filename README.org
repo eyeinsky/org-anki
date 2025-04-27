@@ -14,10 +14,8 @@ card front and content is the back.[fn:how] If the heading has Cloze
 syntax (={{...}}=) then the heading is used to create both the
 question and the answer, and content of the org entry is not used.
 
-Tags are also synchronized; hierarchical tags are enabled by
-customizing =org-anki-hierarchical-tags-separator= to a string that
-serves as hierarchy level separator. This is converted to-and-from
-=::= when syncing entries.
+Tags are also synchronized; hierarchical tags are supported via
+customizing =org-anki-hierarchical-tags-separator= (see below).
 
 See [[/example/example.org][example.org]] and the [[/example/][resulting screenshots]] for how the cards look
 after being synced to Anki.
@@ -72,6 +70,9 @@ lose their scheduling information.
 - =org-anki-default-note-type= :: set note type. By default this is
   ="Basic"=.
 - =org-anki-api-key= :: API key to authenticate to AnkiConnect. See https://foosoft.net/projects/anki-connect/#authentication for more.
+- =org-anki-hierarchical-tags-separator= :: set tag hierarchy
+  separator. This is converted to/from =::= when syncing entries
+  between org and Anki. By default this is set to "off" with =nil=.
 - =org-anki-upload-images= :: set to =t= to sync file content from
   file links to Anki as well. Default is =nil=.
 
