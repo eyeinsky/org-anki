@@ -50,6 +50,16 @@
 (defconst org-anki-note-type "ANKI_NOTE_TYPE")
 (defconst org-anki-prop-global-tags "ANKI_TAGS")
 
+;; Errors
+
+(define-error 'org-anki-error "Org-Anki error")
+(define-error 'org-anki-bad-get "Bad GET" 'org-anki-error)
+(define-error 'org-anki-bad-get-connection
+              "Can't connect (is AnkiConnect running?)" 'org-anki-bad-get)
+(define-error 'org-anki-bad-get-add "Could not add note" 'org-anki-bad-get)
+(define-error 'org-anki-bad-get-delete "Could not delete note" 'org-anki-bad-get)
+(define-error 'org-anki-bad-get-update "Could not update note" 'org-anki-bad-get)
+
 ;; Customizable variables
 
 (defcustom org-anki-default-deck nil
@@ -185,9 +195,7 @@ with result."
       :error
       (cl-function
        (lambda (&key error-thrown &allow-other-keys)
-         (org-anki--report-error
-          "Can't connect to Anki: is the application running and is AnkiConnect installed?\n\nGot error: %s"
-          (cdr error-thrown))))
+         (signal 'org-anki-bad-get-connection (list (cdr error-thrown)))))
 
       :success
       (cl-function
@@ -197,7 +205,7 @@ with result."
            (if the-error
                (if on-error
                    (funcall on-error the-error)
-                 (org-anki--report-error "Unhandled error: %s" the-error))
+                 (signal 'org-anki-error '(the-error)))
            (funcall on-result the-result))))))))
 
 (defun org-anki--get-current-tags (ids)
@@ -342,7 +350,7 @@ Returns a list of pairs of found file-paths and replacements."
        ((= fields-length (+ 1 found-length))
         (let ((missing-field (car (-difference fields found-fields))))
           `(,type ,@(plist-put found missing-field content))))
-       (t (org-anki--report-error
+       (t (error
            "org-anki--get-fields: fields required: %s, fields found: %s, at character: %s"
            fields found-fields (point)))))))
 
@@ -441,11 +449,6 @@ be removed from the Anki app, return actions that do that."
     (org-anki--string-to-anki-mathjax
      (org-export-string-as string 'html t '(:with-toc nil)))))
 
-(defun org-anki--report-error (format &rest args)
-  "FORMAT the ERROR and prefix it with `org-anki error'."
-  (let ((fmt (concat "org-anki error: " format)))
-    (apply #'message fmt args)))
-
 (defun org-anki--report (format_ &rest args)
   "FORMAT_ the ARGS and prefix it with `org-anki'."
   (let* ((fmt (concat "org-anki: " format_)))
@@ -471,7 +474,7 @@ be removed from the Anki app, return actions that do that."
      ((stringp prop-item) prop-item)
      ((stringp prop-global) prop-global)
      ((stringp default) default)
-     (t (error "No property '%s' in item nor file nor set as default!"
+     (t (error "No property '%s' in item, file or default"
                name)))))
 
 (defun org-anki--get-match ()
@@ -558,7 +561,7 @@ be removed from the Anki app, return actions that do that."
     (ignore &rest)
     (if error-msg
         ;; report error
-        (org-anki--report-error "Couldn't add note, received error: %s" error-msg)
+        (signal 'org-anki-error-note-add (list error-msg))
       (cond
        ;; added note
        ((equal "addNote" action-value)
@@ -601,9 +604,7 @@ be removed from the Anki app, return actions that do that."
             )
          (-map 'org-anki--handle-pair sorted)))
      (lambda (the-error)
-       (org-anki--report-error
-        "Couldn't update note, received: %s"
-        the-error)))))
+       (signal 'org-anki-error-note-update '(the-error))))))
 
 (defun org-anki--sync-notes (notes)
   ;; :: [Note] -> IO ()
@@ -659,9 +660,7 @@ be removed from the Anki app, return actions that do that."
                        "note succesfully updated: %s"
                        (org-anki--note-maybe-id note)))
                     (lambda (the-error)
-                      (org-anki--report-error
-                       "Couldn't update note, received: %s"
-                       the-error)))
+                      (signal 'org-anki-error-note-update the-error)))
 
                    ;; Update tags (if any) for the single note, too:
                    (if notes-and-tag-actions2
@@ -687,9 +686,7 @@ be removed from the Anki app, return actions that do that."
             (reverse notes))
            )
          (lambda (the-error)
-           (org-anki--report-error
-            "org-anki-delete-all error: %s"
-            the-error))))))
+           (signal 'org-anki-error-note-delete '(the-error)))))))
 
 (defun org-anki--get-model-fields (model)
   ;; :: String -> [FieldName]
@@ -810,7 +807,7 @@ syntax."
        (lambda (_the-result)
          (org-anki--report "send request succesfully, please switch to anki"))
        (lambda (the-error)
-         (org-anki--report-error
+         (error
           "Browse error, received: %s"
           the-error)
          )))
@@ -921,9 +918,9 @@ Pandoc is required to be installed."
              (org-anki--write-note (org-anki--parse-note json name)))
            the-result))
         (lambda (the-error)
-          (org-anki--report-error "Get deck error, received: %s" the-error))))
+          (error "Get deck error, received: %s" the-error))))
      (lambda (the-error)
-       (org-anki--report-error "Get deck error, received: %s" the-error)))))
+       (error "Get deck error, received: %s" the-error)))))
 
 
 (provide 'org-anki)
