@@ -140,12 +140,16 @@ Duplicates are disabled by default in AnkiConnect but can be enabled."
                  (const :tag "No" nil))
   :group 'org-anki)
 
+(defcustom org-anki-media-method 'filesystem
+  "Method to use to add media to Anki, defaults to 'filesystem.
 
-(defcustom org-anki-upload-images nil
-  "When set to true, images linked in the org-mode text as [[file:<file-path>]]
-are uploaded to Anki. As filename, the SHA1-hash of the image is used and the
-file-path is adjusted accordingly."
-  :type 'boolean
+Filesystem is much faster when Anki and org-mode are run on the
+same machine. HTTP is required when you run AnkiConnect on a
+different host and talk to it only via HTTP. It appears to be
+very slow."
+  :type '(choice
+           (const :tag "Copy file via filesystem" 'filesystem)
+           (const :tag "Upload file via AnkiConnect's HTTP API" 'http))
   :group 'org-anki)
 
 ;; Stolen code
@@ -264,6 +268,21 @@ Returns a list of pairs of found file-paths and replacements."
             (push (cons file-path new-filename) file-pairs))))
       file-pairs)))
 
+(defvar org-anki--media-dir nil)
+(defun org-anki--ensure-media-dir (&rest force)
+  ;; :: IO ()
+  "If not present, get Anki media dir path from AnkiConnect and save it to org-anki--media-dir"
+  (if (or (not (stringp org-anki--media-dir)) force)
+      (progn
+        (org-anki--report "Anki media dir not set, querying it..")
+        (org-anki-connect-request
+         (org-anki--body "getMediaDirPath")
+         (lambda (dir)
+           (org-anki--report "Anki media dir gotten: %s" dir)
+           (setq org-anki--media-dir dir))
+         (lambda (err) (org-anki--report-error "Failed to get media directory of Anki %s" err))
+         :sync t))))
+
 (defun org-anki--upload-file (name contents)
   (let ((base64-data (base64-encode-string contents t)))
     (org-anki-connect-request
@@ -271,12 +290,28 @@ Returns a list of pairs of found file-paths and replacements."
       "storeMediaFile"
       `(("filename" . ,name)
         ("data" . ,base64-data)))
-     (lambda (_result) (org-anki--report "File uploaded: %s" new-filename))
+     (lambda (_result) (org-anki--report "File uploaded: %s" name))
      (lambda (error) (org-anki--report-error "File upload error: %s" error)))))
 
-(defun org-anki--process-file-links (content)
+(defun org-anki--copy-files (content)
+  (org-anki--ensure-media-dir)
+  (let ((file-pairs (org-anki--collect-file-links content)))
+    (if file-pairs (org-anki--debug "Adding files by copying them to media folder via the filesystem"))
+    (dolist (pair file-pairs)
+      (let* ((from-path (car pair))
+             (to-path (concat org-anki--media-dir "/" (cdr pair))))
+        (org-anki--report "cp %s %s" from-path to-path)
+        (copy-file from-path to-path t)
+        ;; Replace the link in content
+        (setq content (string-replace (format "[[file:%s]]" from-path)
+                                      (format "[[file:%s]]" to-path)
+                                      content)))))
+  content)
+
+(defun org-anki--upload-files (content)
   "Find image links in CONTENT, replacing them with hashed filenames and uploading the images to Anki."
   (let ((file-pairs (org-anki--collect-file-links content)))
+    (if file-pairs (org-anki--debug "Adding files by uploading them via AnkiConnect HTTP API"))
     (dolist (pair file-pairs)
       (let* ((file-path (car pair))
              (new-filename (cdr pair))
@@ -448,8 +483,10 @@ be removed from the Anki app, return actions that do that."
   ;; :: Org -> Html
   "Convert STRING (org element heading or content) to html."
   (save-excursion
-    (when org-anki-upload-images
-      (setq string (org-anki--process-file-links string)))
+    (cond
+     ((equal org-anki-media-method 'filesystem) (setq string (org-anki--copy-files string)))
+     ((equal org-anki-media-method 'http) (setq string (org-anki--upload-files string)))
+     (t (user-error "`org-anki-media-method` set incorrectly")))
     (org-anki--string-to-anki-mathjax
      (org-export-string-as string 'html t '(:with-toc nil)))))
 
