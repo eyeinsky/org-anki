@@ -437,6 +437,7 @@ be removed from the Anki app, return actions that do that."
     (substring-no-properties str 0 (length str))))
 
 (defun org-anki--org-to-html (string)
+  ;; :: Org -> Html
   "Convert STRING (org element heading or content) to html."
   (save-excursion
     (when org-anki-upload-images
