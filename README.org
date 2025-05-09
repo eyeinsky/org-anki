@@ -75,7 +75,16 @@ lose their scheduling information.
   between org and Anki. By default this is set to "off" with =nil=.
 - =org-anki-upload-images= :: set to =t= to sync file content from
   file links to Anki as well. Default is =nil=.
+** FAQ
+*** How to only sync entries with certain tag?
+=org-anki-sync-all= would by default sync all org entries in the
+buffer to Anki. To restrict this to a certain tag, either:
+- add =#+ANKI_MATCH: +card= to the top of the file
+- customize the =org-anki-default-match= variable
 
+Note that if you have previously synced org entries one-by-one then
+simply running =org-anki-update-all= is enough -- it only updates
+already created notes and doesn't add any new ones.
 ** Why
 .. as there are [[https://github.com/louietan/anki-editor][anki-editor]], [[https://github.com/abo-abo/pamparam][pamparam]], [[https://gitlab.com/phillord/org-drill][org-drill]], [[https://github.com/l3kn/org-fc][org-fc]]?
 
