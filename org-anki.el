@@ -134,12 +134,15 @@ how to use it to include or skip an entry from being synced."
                  (const :tag "No" nil))
   :group 'org-anki)
 
-
-(defcustom org-anki-upload-images nil
-  "When set to true, images linked in the org-mode text as [[file:<file-path>]]
-are uploaded to Anki. As filename, the SHA1-hash of the image is used and the
-file-path is adjusted accordingly."
-  :type 'boolean
+(defcustom org-anki-media-method 'copy
+  "How to add media to Anki: 'copy means copy via filesystem,
+'upload means upload via HTTP. In poth cases images linked in the
+org-mode text as [[file:<file-path>]] are uploaded to Anki. As
+filename, the SHA1-hash of the image is used and the file-path is
+adjusted accordingly."
+  :type '(choice
+           (const :tag "Copy file via filesystem" 'copy)
+           (const :tag "Upload file via AnkiConnect's HTTP API" 'upload))
   :group 'org-anki)
 
 ;; Stolen code
@@ -256,6 +259,16 @@ Returns a list of pairs of found file-paths and replacements."
             (push (cons file-path new-filename) file-pairs))))
       file-pairs)))
 
+(defvar org-anki--media-dir nil)
+(defun org-anki--ensure-media-dir (&rest force)
+  ;; :: IO ()
+  "If not present, get Anki media dir path from AnkiConnect and save it to org-anki--media-dir"
+  (if (or (not (stringp org-anki--media-dir)) force)
+      (org-anki-connect-request
+       (org-anki--body "getMediaDirPath")
+       (lambda (dir) (setq org-anki--media-dir dir))
+       (lambda (err) (org-anki--report-error "Failed to get media directory of Anki %s" err)))))
+
 (defun org-anki--upload-file (name contents)
   (let ((base64-data (base64-encode-string contents t)))
     (org-anki-connect-request
@@ -266,7 +279,20 @@ Returns a list of pairs of found file-paths and replacements."
      (lambda (_result) (org-anki--report "File uploaded: %s" new-filename))
      (lambda (error) (org-anki--report-error "File upload error: %s" error)))))
 
-(defun org-anki--process-file-links (content)
+(defun org-anki--copy-files (content)
+  (org-anki--ensure-media-dir)
+  (let ((file-pairs (org-anki--collect-file-links content)))
+    (dolist (pair file-pairs)
+      (let* ((file-path (car pair))
+             (new-filename (cdr pair)))
+        (copy-file file-path (concat org-anki--media-dir "/" new-filename))
+        ;; Replace the link in content
+        (setq content (string-replace (format "[[file:%s]]" file-path)
+                                      (format "[[file:%s]]" new-filename)
+                                      content)))))
+  content)
+
+(defun org-anki--upload-files (content)
   "Find image links in CONTENT, replacing them with hashed filenames and uploading the images to Anki."
   (let ((file-pairs (org-anki--collect-file-links content)))
     (dolist (pair file-pairs)
@@ -440,8 +466,9 @@ be removed from the Anki app, return actions that do that."
   ;; :: Org -> Html
   "Convert STRING (org element heading or content) to html."
   (save-excursion
-    (when org-anki-upload-images
-      (setq string (org-anki--process-file-links string)))
+    (cond
+     ((equal org-anki-media-method 'copy)   (setq string (org-anki--copy-files string)))
+     ((equal org-anki-media-method 'upload) (setq string (org-anki--upload-files string))))
     (org-anki--string-to-anki-mathjax
      (org-export-string-as string 'html t '(:with-toc nil)))))
 
