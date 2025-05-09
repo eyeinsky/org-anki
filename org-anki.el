@@ -264,6 +264,16 @@ Returns a list of pairs of found file-paths and replacements."
             (push (cons file-path new-filename) file-pairs))))
       file-pairs)))
 
+(defun org-anki--upload-file (name contents)
+  (let ((base64-data (base64-encode-string contents t)))
+    (org-anki-connect-request
+     (org-anki--body
+      "storeMediaFile"
+      `(("filename" . ,name)
+        ("data" . ,base64-data)))
+     (lambda (_result) (org-anki--report "File uploaded: %s" new-filename))
+     (lambda (error) (org-anki--report-error "File upload error: %s" error)))))
+
 (defun org-anki--process-file-links (content)
   "Find image links in CONTENT, replacing them with hashed filenames and uploading the images to Anki."
   (let ((file-pairs (org-anki--collect-file-links content)))
@@ -272,15 +282,8 @@ Returns a list of pairs of found file-paths and replacements."
              (new-filename (cdr pair))
              (file-contents (with-temp-buffer
                               (insert-file-contents file-path)
-                              (buffer-string)))
-             (base64-data (base64-encode-string file-contents t)))
-        (org-anki-connect-request
-         (org-anki--body
-          "storeMediaFile"
-          `(("filename" . ,new-filename)
-            ("data" . ,base64-data)))
-         (lambda (_result) (org-anki--report "File uploaded: %s" new-filename))
-         (lambda (error) (org-anki--report-error "File upload error: %s" error)))
+                              (buffer-string))))
+        (org-anki--upload-file new-filename file-contents)
         ;; Replace the link in content
         (setq content (string-replace (format "[[file:%s]]" file-path)
                                       (format "[[file:%s]]" new-filename)
@@ -442,6 +445,7 @@ be removed from the Anki app, return actions that do that."
     (substring-no-properties str 0 (length str))))
 
 (defun org-anki--org-to-html (string)
+  ;; :: Org -> Html
   "Convert STRING (org element heading or content) to html."
   (save-excursion
     (when org-anki-upload-images
