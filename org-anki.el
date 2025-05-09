@@ -285,7 +285,7 @@ Returns a list of pairs of found file-paths and replacements."
     (dolist (pair file-pairs)
       (let* ((file-path (car pair))
              (new-filename (cdr pair)))
-        (copy-file file-path (concat org-anki--media-dir "/" new-filename))
+        (copy-file file-path (concat org-anki--media-dir "/" new-filename) t)
         ;; Replace the link in content
         (setq content (string-replace (format "[[file:%s]]" file-path)
                                       (format "[[file:%s]]" new-filename)
