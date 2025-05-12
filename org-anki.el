@@ -354,10 +354,10 @@ Returns a list of pairs of found file-paths and replacements."
 
 ;;; JSON payloads
 
-(defun org-anki--body (action params)
+(defun org-anki--body (action &optional params)
   "Wrap ACTION and PARAMS to a json payload AnkiConnect expects."
   `(("action" . ,action)
-    ("params" . ,params)))
+    ,@(if params `(("params" . ,params)))))
 
 (defun org-anki--create-note-single (note)
   "Create an `addNote' json structure to be added to DECK with
