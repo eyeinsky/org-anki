@@ -171,7 +171,7 @@ Default NAME is \"PROPERTY\", default BUFFER the current buffer."
 
 ;; AnkiConnect API
 
-(defun org-anki-connect-request (body on-result on-error)
+(defun org-anki-connect-request (body on-result on-error &rest more-request-params)
   "Perform HTTP GET request to AnkiConnect, address is
 customizable by the org-anki-ankiconnnect-listen-address variable.
 
@@ -181,7 +181,7 @@ with result."
                `(("version" . 6)
                  ,@(if org-anki-api-key `(("key" . ,org-anki-api-key)))
                  ,@body))))
-    (request
+    (apply 'request
       org-anki-ankiconnnect-listen-address
       :type "GET"
       :data json
@@ -204,7 +204,9 @@ with result."
                (if on-error
                    (funcall on-error the-error)
                  (org-anki--report-error "Unhandled error: %s" the-error))
-           (funcall on-result the-result))))))))
+             (funcall on-result the-result)))))
+      more-request-params
+      )))
 
 (defun org-anki--get-current-tags (ids)
   ;; :: [Id] -> Promise [[Tag]]
