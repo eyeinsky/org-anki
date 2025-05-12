@@ -39,7 +39,6 @@
 (require 'promise)
 (require 'request)
 (require 'thunk)
-(require 'sha1)
 (require 'base64)
 
 ;; Constants
@@ -247,26 +246,37 @@ with result."
      (if fn (cons field-name (funcall fn field-value)) (cons field-name field-value)))
    fields))
 
+;; Sync local media
+
 (defun org-anki--collect-file-links (content)
-  "Find image links of form [[file:<file-path>]] and derive hash-based filename.
-Returns a list of pairs of found file-paths and replacements."
-  (let ((regex "\\[\\[file:\\([^]]+\\)\\]\\]"))
+  ;; :: HTML -> [(SrcPath, NewName)]
+  "Find image links of form HTML.
+
+Find local file links from HTML src attributes, create filenames
+from inode number and basename for each; returns a list of pairs
+of found file-paths and replacements."
+  (let ((regex "src=\"file://\\([^\"]+\\)\""))
     (let (file-pairs)
       (with-temp-buffer
         (insert content)
         (goto-char (point-min))
         (while (re-search-forward regex nil t)
           (let* ((file-path (match-string 1))
-                 (file-contents (with-temp-buffer
-                                  (insert-file-contents file-path)
-                                  (buffer-string)))
-                 (file-hash (sha1 file-contents))
-                 (file-ext (file-name-extension file-path t))
-                 (new-filename (concat file-hash file-ext)))
+                 (inode (file-attribute-inode-number (file-attributes file-path)))
+                 (basename (file-name-nondirectory file-path))
+                 (new-filename (concat (number-to-string inode) "_" basename)))
 	    (org-anki--debug "Found link: %s" file-path)
             (org-anki--debug "Replacement filename: %s" new-filename)
             (push (cons file-path new-filename) file-pairs))))
       file-pairs)))
+
+(defun org-anki--media-replace (file-path new-filename html)
+  (let ((from-pat (format "src=\"file://%s\"" file-path))
+        (to-pat (format "src=\"%s\"" new-filename)))
+    (org-anki--report "replace %s %s" from-pat to-pat)
+    (string-replace from-pat to-pat html)))
+
+;;; Via filesystem
 
 (defvar org-anki--media-dir nil)
 (defun org-anki--ensure-media-dir (&rest force)
@@ -283,6 +293,20 @@ Returns a list of pairs of found file-paths and replacements."
          (lambda (err) (org-anki--report-error "Failed to get media directory of Anki %s" err))
          :sync t))))
 
+(defun org-anki--copy-files (file-pairs content)
+  (org-anki--ensure-media-dir)
+  (if file-pairs (org-anki--debug "Adding files by copying them to media folder via the filesystem"))
+  (--reduce-from
+   (-let* (((file-path . new-filename) it)
+           (to-path (concat org-anki--media-dir "/" new-filename)))
+   (org-anki--report "cp %s %s" file-path to-path)
+   (copy-file file-path to-path t)
+   (org-anki--media-replace file-path new-filename acc))
+   content
+   file-pairs))
+
+;;; Via HTTP
+
 (defun org-anki--upload-file (name contents)
   (let ((base64-data (base64-encode-string contents t)))
     (org-anki-connect-request
@@ -293,37 +317,21 @@ Returns a list of pairs of found file-paths and replacements."
      (lambda (_result) (org-anki--report "File uploaded: %s" name))
      (lambda (error) (org-anki--report-error "File upload error: %s" error)))))
 
-(defun org-anki--copy-files (content)
-  (org-anki--ensure-media-dir)
-  (let ((file-pairs (org-anki--collect-file-links content)))
-    (if file-pairs (org-anki--debug "Adding files by copying them to media folder via the filesystem"))
-    (dolist (pair file-pairs)
-      (let* ((from-path (car pair))
-             (to-path (concat org-anki--media-dir "/" (cdr pair))))
-        (org-anki--report "cp %s %s" from-path to-path)
-        (copy-file from-path to-path t)
-        ;; Replace the link in content
-        (setq content (string-replace (format "[[file:%s]]" from-path)
-                                      (format "[[file:%s]]" to-path)
-                                      content)))))
-  content)
-
-(defun org-anki--upload-files (content)
+(defun org-anki--upload-files (file-pairs content)
   "Find image links in CONTENT, replacing them with hashed filenames and uploading the images to Anki."
-  (let ((file-pairs (org-anki--collect-file-links content)))
-    (if file-pairs (org-anki--debug "Adding files by uploading them via AnkiConnect HTTP API"))
-    (dolist (pair file-pairs)
-      (let* ((file-path (car pair))
-             (new-filename (cdr pair))
-             (file-contents (with-temp-buffer
-                              (insert-file-contents file-path)
-                              (buffer-string))))
-        (org-anki--upload-file new-filename file-contents)
-        ;; Replace the link in content
-        (setq content (string-replace (format "[[file:%s]]" file-path)
-                                      (format "[[file:%s]]" new-filename)
-                                      content)))))
-  content)
+  (if file-pairs (org-anki--debug "Adding files by uploading them via AnkiConnect HTTP API"))
+  (--reduce-from
+   (-let* (((file-path . new-filename) it)
+           (to-path (concat org-anki--media-dir "/" new-filename))
+           (file-contents (with-temp-buffer
+                            (insert-file-contents file-path)
+                            (buffer-string))))
+     (org-anki--upload-file new-filename file-contents)
+     (org-anki--media-replace file-path new-filename acc))
+   content
+   file-pairs))
+
+;; Note
 
 (defun org-anki--note-at-point ()
   "Create an Anki note from whereever the cursor is"
@@ -483,12 +491,15 @@ be removed from the Anki app, return actions that do that."
   ;; :: Org -> Html
   "Convert STRING (org element heading or content) to html."
   (save-excursion
-    (cond
-     ((equal org-anki-media-method 'filesystem) (setq string (org-anki--copy-files string)))
-     ((equal org-anki-media-method 'http) (setq string (org-anki--upload-files string)))
-     (t (user-error "`org-anki-media-method` set incorrectly")))
-    (org-anki--string-to-anki-mathjax
-     (org-export-string-as string 'html t '(:with-toc nil)))))
+    (let*
+        ((html (org-anki--string-to-anki-mathjax (org-export-string-as string 'html t '(:with-toc nil))))
+         (file-pairs (org-anki--collect-file-links html))
+         (converter
+          (cond
+           ((equal org-anki-media-method 'filesystem) 'org-anki--copy-files)
+           ((equal org-anki-media-method 'http) 'org-anki--upload-files)
+           (t (user-error "`org-anki-media-method` set incorrectly")))))
+      (funcall converter file-pairs html))))
 
 (defun org-anki--report-error (format &rest args)
   "FORMAT the ERROR and prefix it with `org-anki error'."
