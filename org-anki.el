@@ -59,12 +59,15 @@ property"
   :group 'org-anki)
 
 (defcustom org-anki-default-match nil
-  "Default match used in `org-map-entries` for sync all."
+  "MATCH argument for the `org-map-entries` function when syncing
+all cards.
+
+See help for `org-map-entries` for how it's used."
   :type '(string)
   :group 'org-anki)
 
 (defcustom org-anki-default-note-type "Basic"
-  "Default note type."
+  "Default note type, \"Basic\" by default."
   :type '(string)
   :group 'org-anki)
 
@@ -92,7 +95,7 @@ Each one is a list, the first item is the model name and the rest are field name
   ;; See https://github.com/eyeinsky/org-anki/pull/58 for more.
 
 (defcustom org-anki-ankiconnnect-listen-address "http://127.0.0.1:8765"
-  "The address of AnkiConnect"
+  "The network listening address of AnkiConnect, http://127.0.0.1:8765 by default."
   :type '(string)
   :group 'org-anki)
 
@@ -103,33 +106,36 @@ See https://foosoft.net/projects/anki-connect/#authentication for more."
   :group 'org-anki)
 
 (defcustom org-anki-inherit-tags t
-  "Inherit tags, set to nil to turn off."
+  "Inherit tags from parent entries: enabled by default, set to nil to turn off."
   :type 'boolean
   :group 'org-anki)
 
 (defcustom org-anki-ignored-tags nil
-  "Tags that are always ignored when syncing to Anki."
+  "List of tags that are ignored when syncing cards from org-mode to Anki."
   :type '(repeat string)
   :group 'org-anki)
 
 (defcustom org-anki-hierarchical-tags-separator nil
-  "Set huerarchical tags separator.
-Set this to a string (e.g., a double under-bar) that is used in
-your org file to represent the separator '::' (otherwise not
-allowed in a tag name in org-mode) used in Anki's hierarchical
-tags."
+  "Set hierarchical tags separator.
+
+Set this to a some string, e.g., a double under-bar. The string
+is used in your org file to represent the Anki's hierarchical
+tags' separator '::', which itself is not allowed in org-mode tag
+names."
   :type '(string)
   :group 'org-anki)
 
 (defcustom org-anki-skip-function nil
-  "Function used to skip entries.
-Given as the SKIP argument to org-map-entries, see its help for
-how to use it to include or skip an entry from being synced."
+  "SKIP argument for `org-map-entries` function.
+
+See help for `org-map-entries` for how it's used."
   :type '(function)
   :group 'org-anki)
 
 (defcustom org-anki-allow-duplicates nil
-  "Allow duplicates."
+  "Allow duplicate cards.
+
+Duplicates are disabled by default in AnkiConnect but can be enabled."
   :type '(choice (const :tag "Yes" t)
                  (const :tag "No" nil))
   :group 'org-anki)
