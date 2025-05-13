@@ -1,0 +1,13 @@
+* Contributing
+
+AnkiConnect [[https://git.sr.ht/~foosoft/anki-connect][homepage]], [[https://github.com/amikey/anki-connect/issues][github]]: org-anki talks to the Anki app via
+AnkiConnect's HTTP API, so this is highly relevant if you want to
+contribute.
+
+** Development ideas
+- Switch away from [[https://melpa.org/#/promise][promise]] to either [[https://melpa.org/#/async][async]] or [[https://melpa.org/#/deferred][deferred]], both of which
+  have lots more users and might thus be easier to use.
+- Move elisp code talking to AnkiConnect API to a separate file (and
+  in the long run possibly make it a separate package).
+- Generate a reference for customizable variables from source, instead
+  of maintaining it manually.
