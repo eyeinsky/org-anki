@@ -268,7 +268,8 @@ of found file-paths and replacements."
 	    (org-anki--debug "Found link: %s" file-path)
             (org-anki--debug "Replacement filename: %s" new-filename)
             (push (cons file-path new-filename) file-pairs))))
-      file-pairs)))
+      (print "FILE-PAIRS")
+      (print file-pairs))))
 
 (defun org-anki--media-replace (file-path new-filename html)
   (let ((from-pat (format "src=\"file://%s\"" file-path))
