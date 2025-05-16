@@ -264,10 +264,13 @@ of found file-paths and replacements."
           (let* ((attr (match-string 1))      ; src
                  (protocol (match-string 2))  ; https://
                  (from-pat (match-string 0))  ; the entire match
-                 (file-path (match-string 4)))
+                 (file-path (match-string 4))); verbatim path/to/file, no protoco
             (if (member protocol '("file://" nil))
                 (let* ((inode (file-attribute-inode-number (file-attributes file-path)))
-                       (basename (file-name-nondirectory file-path))
+                       (basename0 (file-name-nondirectory file-path))
+                       ;; ^ SOMEDAY-MAYBE: Filenames containing hashes don't play nor
+                       ;; sync with Anki, so replace them.
+                       (basename (string-replace "#" "_" basename0))
                        (new-filename (concat (number-to-string inode) "_" basename))
                        (to-pat (concat attr "=\"" new-filename "\"")))
                   (push `(,from-pat ,to-pat ,file-path ,new-filename) file-pairs))
@@ -302,6 +305,8 @@ of found file-paths and replacements."
             (to-path (concat org-anki--media-dir "/" new-filename)))
       (org-anki--report "cp %s %s" file-path to-path)
       (delete-file to-path)
+      ;; ^ SOMEDAY-MAYBE: Files with no write permission throw an
+      ;; error when being overwritten, so delete them first.
       (copy-file file-path to-path t)
       (string-replace from-pat to-pat acc))
     html-in
