@@ -255,27 +255,24 @@ with result."
 Find local file links from HTML src attributes, create filenames
 from inode number and basename for each; returns a list of pairs
 of found file-paths and replacements."
-  (let ((regex "src=\"file://\\([^\"]+\\)\""))
+  (let ((regex "\\(href\\|src\\)=\"\\(\\(file\\|http\\|https\\)://\\)?\\([^\"]+\\)\""))
     (let (file-pairs)
       (with-temp-buffer
         (insert content)
         (goto-char (point-min))
         (while (re-search-forward regex nil t)
-          (let* ((file-path (match-string 1))
-                 (inode (file-attribute-inode-number (file-attributes file-path)))
-                 (basename (file-name-nondirectory file-path))
-                 (new-filename (concat (number-to-string inode) "_" basename)))
-	    (org-anki--debug "Found link: %s" file-path)
-            (org-anki--debug "Replacement filename: %s" new-filename)
-            (push (cons file-path new-filename) file-pairs))))
-      (print "FILE-PAIRS")
-      (print file-pairs))))
-
-(defun org-anki--media-replace (file-path new-filename html)
-  (let ((from-pat (format "src=\"file://%s\"" file-path))
-        (to-pat (format "src=\"%s\"" new-filename)))
-    (org-anki--report "replace %s %s" from-pat to-pat)
-    (string-replace from-pat to-pat html)))
+          (let* ((attr (match-string 1))      ; src
+                 (protocol (match-string 2))  ; https://
+                 (from-pat (match-string 0))  ; the entire match
+                 (file-path (match-string 4)))
+            (if (member protocol '("file://" nil))
+                (let* ((inode (file-attribute-inode-number (file-attributes file-path)))
+                       (basename (file-name-nondirectory file-path))
+                       (new-filename (concat (number-to-string inode) "_" basename))
+                       (to-pat (concat attr "=\"" new-filename "\"")))
+                  (push `(,from-pat ,to-pat ,file-path ,new-filename) file-pairs))
+              ))))
+      file-pairs)))
 
 ;;; Via filesystem
 
@@ -294,17 +291,21 @@ of found file-paths and replacements."
          (lambda (err) (org-anki--report-error "Failed to get media directory of Anki %s" err))
          :sync t))))
 
-(defun org-anki--copy-files (file-pairs content)
+(defun org-anki--copy-files (file-pairs html-in)
   (org-anki--ensure-media-dir)
   (if file-pairs (org-anki--debug "Adding files by copying them to media folder via the filesystem"))
-  (--reduce-from
-   (-let* (((file-path . new-filename) it)
-           (to-path (concat org-anki--media-dir "/" new-filename)))
-   (org-anki--report "cp %s %s" file-path to-path)
-   (copy-file file-path to-path t)
-   (org-anki--media-replace file-path new-filename acc))
-   content
-   file-pairs))
+  (message "<HTML-IN> %s </HTML-IN>" html-in)
+  (message
+   "<HTML-OUT> %s </HTML-OUT>"
+   (--reduce-from
+    (-let* (((from-pat to-pat file-path new-filename) it)
+            (to-path (concat org-anki--media-dir "/" new-filename)))
+      (org-anki--report "cp %s %s" file-path to-path)
+      (delete-file to-path)
+      (copy-file file-path to-path t)
+      (string-replace from-pat to-pat acc))
+    html-in
+    file-pairs)))
 
 ;;; Via HTTP
 
@@ -318,19 +319,21 @@ of found file-paths and replacements."
      (lambda (_result) (org-anki--report "File uploaded: %s" name))
      (lambda (error) (org-anki--report-error "File upload error: %s" error)))))
 
-(defun org-anki--upload-files (file-pairs content)
+(defun org-anki--upload-files (file-pairs html-in)
   "Find image links in CONTENT, replacing them with hashed filenames and uploading the images to Anki."
   (if file-pairs (org-anki--debug "Adding files by uploading them via AnkiConnect HTTP API"))
+  (message "<HTML-IN> %s </HTML-IN>" html-in)
+  (message "<HTML-OUT> %s </HTML-OUT>"
   (--reduce-from
-   (-let* (((file-path . new-filename) it)
+   (-let* (((from-pat to-pat file-path new-filename) it)
            (to-path (concat org-anki--media-dir "/" new-filename))
            (file-contents (with-temp-buffer
                             (insert-file-contents file-path)
                             (buffer-string))))
      (org-anki--upload-file new-filename file-contents)
-     (org-anki--media-replace file-path new-filename acc))
-   content
-   file-pairs))
+     (string-replace from-pat to-pat acc))
+   html-in
+   file-pairs)))
 
 ;; Note
 
