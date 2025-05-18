@@ -265,15 +265,22 @@ of found file-paths and replacements."
                  (protocol (match-string 2))  ; https://
                  (from-pat (match-string 0))  ; the entire match
                  (file-path (match-string 4))); verbatim path/to/file, no protoco
+            (message "from-pat %s" from-pat)
             (if (member protocol '("file://" nil))
-                (let* ((inode (file-attribute-inode-number (file-attributes file-path)))
-                       (basename0 (file-name-nondirectory file-path))
-                       ;; ^ SOMEDAY-MAYBE: Filenames containing hashes don't play nor
-                       ;; sync with Anki, so replace them.
-                       (basename (string-replace "#" "_" basename0))
-                       (new-filename (concat (number-to-string inode) "_" basename))
-                       (to-pat (concat attr "=\"" new-filename "\"")))
-                  (push `(,from-pat ,to-pat ,file-path ,new-filename) file-pairs))
+                (if (file-exists-p file-path)
+                    (let* ((inode (file-attribute-inode-number (file-attributes file-path)))
+                           (basename0 (file-name-nondirectory file-path))
+                           ;; ^ SOMEDAY-MAYBE: Filenames containing hashes don't play nor
+                           ;; sync with Anki, so replace them.
+                           (basename (string-replace "#" "_" basename0))
+                           (new-filename (concat (number-to-string inode) "_" basename))
+                           (to-pat (concat attr "=\"" new-filename "\"")))
+                      (push `(,from-pat ,to-pat ,file-path ,new-filename) file-pairs))
+                  (error "")
+
+                  )
+
+
               ))))
       file-pairs)))
 
