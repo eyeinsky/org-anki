@@ -3,7 +3,7 @@
 ;; Copyright (C) 2020 Markus Läll
 ;;
 ;; URL: https://github.com/eyeinsky/org-anki
-;; Version: 3.5.2
+;; Version: 4.0.0
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
 ;; Package-Requires: ((emacs "27.1") (request "0.3.2") (dash "2.17") (promise "1.1"))
@@ -39,7 +39,6 @@
 (require 'promise)
 (require 'request)
 (require 'thunk)
-(require 'sha1)
 (require 'base64)
 
 ;; Constants
@@ -59,12 +58,15 @@ property"
   :group 'org-anki)
 
 (defcustom org-anki-default-match nil
-  "Default match used in `org-map-entries` for sync all."
+  "MATCH argument for the `org-map-entries` function when syncing
+all cards.
+
+See help for `org-map-entries` for how it's used."
   :type '(string)
   :group 'org-anki)
 
 (defcustom org-anki-default-note-type "Basic"
-  "Default note type."
+  "Default note type, \"Basic\" by default."
   :type '(string)
   :group 'org-anki)
 
@@ -92,7 +94,7 @@ Each one is a list, the first item is the model name and the rest are field name
   ;; See https://github.com/eyeinsky/org-anki/pull/58 for more.
 
 (defcustom org-anki-ankiconnnect-listen-address "http://127.0.0.1:8765"
-  "The address of AnkiConnect"
+  "The network listening address of AnkiConnect, http://127.0.0.1:8765 by default."
   :type '(string)
   :group 'org-anki)
 
@@ -103,43 +105,50 @@ See https://foosoft.net/projects/anki-connect/#authentication for more."
   :group 'org-anki)
 
 (defcustom org-anki-inherit-tags t
-  "Inherit tags, set to nil to turn off."
+  "Inherit tags from parent entries: enabled by default, set to nil to turn off."
   :type 'boolean
   :group 'org-anki)
 
 (defcustom org-anki-ignored-tags nil
-  "Tags that are always ignored when syncing to Anki."
+  "List of tags that are ignored when syncing cards from org-mode to Anki."
   :type '(repeat string)
   :group 'org-anki)
 
 (defcustom org-anki-hierarchical-tags-separator nil
-  "Set huerarchical tags separator.
-Set this to a string (e.g., a double under-bar) that is used in
-your org file to represent the separator '::' (otherwise not
-allowed in a tag name in org-mode) used in Anki's hierarchical
-tags."
+  "Set hierarchical tags separator.
+
+Set this to a some string, e.g., a double under-bar. The string
+is used in your org file to represent the Anki's hierarchical
+tags' separator '::', which itself is not allowed in org-mode tag
+names."
   :type '(string)
   :group 'org-anki)
 
 (defcustom org-anki-skip-function nil
-  "Function used to skip entries.
-Given as the SKIP argument to org-map-entries, see its help for
-how to use it to include or skip an entry from being synced."
+  "SKIP argument for `org-map-entries` function.
+
+See help for `org-map-entries` for how it's used."
   :type '(function)
   :group 'org-anki)
 
 (defcustom org-anki-allow-duplicates nil
-  "Allow duplicates."
+  "Allow duplicate cards.
+
+Duplicates are disabled by default in AnkiConnect but can be enabled."
   :type '(choice (const :tag "Yes" t)
                  (const :tag "No" nil))
   :group 'org-anki)
 
+(defcustom org-anki-media-method 'filesystem
+  "Method to use to add media to Anki, defaults to 'filesystem.
 
-(defcustom org-anki-upload-images nil
-  "When set to true, images linked in the org-mode text as [[file:<file-path>]]
-are uploaded to Anki. As filename, the SHA1-hash of the image is used and the
-file-path is adjusted accordingly."
-  :type 'boolean
+Filesystem is much faster when Anki and org-mode are run on the
+same machine. HTTP is required when you run AnkiConnect on a
+different host and talk to it only via HTTP. It appears to be
+very slow."
+  :type '(choice
+           (const :tag "Copy file via filesystem" 'filesystem)
+           (const :tag "Upload file via AnkiConnect's HTTP API" 'http))
   :group 'org-anki)
 
 ;; Stolen code
@@ -165,7 +174,7 @@ Default NAME is \"PROPERTY\", default BUFFER the current buffer."
 
 ;; AnkiConnect API
 
-(defun org-anki-connect-request (body on-result on-error)
+(defun org-anki-connect-request (body on-result on-error &rest more-request-params)
   "Perform HTTP GET request to AnkiConnect, address is
 customizable by the org-anki-ankiconnnect-listen-address variable.
 
@@ -175,7 +184,7 @@ with result."
                `(("version" . 6)
                  ,@(if org-anki-api-key `(("key" . ,org-anki-api-key)))
                  ,@body))))
-    (request
+    (apply 'request
       org-anki-ankiconnnect-listen-address
       :type "GET"
       :data json
@@ -198,7 +207,9 @@ with result."
                (if on-error
                    (funcall on-error the-error)
                  (org-anki--report-error "Unhandled error: %s" the-error))
-           (funcall on-result the-result))))))))
+             (funcall on-result the-result)))))
+      more-request-params
+      )))
 
 (defun org-anki--get-current-tags (ids)
   ;; :: [Id] -> Promise [[Tag]]
@@ -235,49 +246,96 @@ with result."
      (if fn (cons field-name (funcall fn field-value)) (cons field-name field-value)))
    fields))
 
+;; Sync local media
+
 (defun org-anki--collect-file-links (content)
-  "Find image links of form [[file:<file-path>]] and derive hash-based filename.
-Returns a list of pairs of found file-paths and replacements."
-  (let ((regex "\\[\\[file:\\([^]]+\\)\\]\\]"))
+  ;; :: HTML -> [(SrcPath, NewName)]
+  "Find image links of form HTML.
+
+Find local file links from HTML src attributes, create filenames
+from inode number and basename for each; returns a list of pairs
+of found file-paths and replacements."
+  (let ((regex "\\(href\\|src\\)=\"\\(\\(file\\|http\\|https\\)://\\)?\\([^\"]+\\)\""))
     (let (file-pairs)
       (with-temp-buffer
         (insert content)
         (goto-char (point-min))
         (while (re-search-forward regex nil t)
-          (let* ((file-path (match-string 1))
-                 (file-contents (with-temp-buffer
-                                  (insert-file-contents file-path)
-                                  (buffer-string)))
-                 (file-hash (sha1 file-contents))
-                 (file-ext (file-name-extension file-path t))
-                 (new-filename (concat file-hash file-ext)))
-	    (org-anki--debug "Found link: %s" file-path)
-            (org-anki--debug "Replacement filename: %s" new-filename)
-            (push (cons file-path new-filename) file-pairs))))
+          (let* ((attr (match-string 1))      ; src
+                 (protocol (match-string 2))  ; https://
+                 (from-pat (match-string 0))  ; the entire match
+                 (file-path (match-string 4))); verbatim path/to/file, no protoco
+            (if (member protocol '("file://" nil))
+                (let* ((inode (file-attribute-inode-number (file-attributes file-path)))
+                       (basename0 (file-name-nondirectory file-path))
+                       ;; ^ SOMEDAY-MAYBE: Filenames containing hashes don't play nor
+                       ;; sync with Anki, so replace them.
+                       (basename (string-replace "#" "_" basename0))
+                       (new-filename (concat (number-to-string inode) "_" basename))
+                       (to-pat (concat attr "=\"" new-filename "\"")))
+                  (push `(,from-pat ,to-pat ,file-path ,new-filename) file-pairs))
+              ))))
       file-pairs)))
 
-(defun org-anki--process-file-links (content)
-  "Find image links in CONTENT, replacing them with hashed filenames and uploading the images to Anki."
-  (let ((file-pairs (org-anki--collect-file-links content)))
-    (dolist (pair file-pairs)
-      (let* ((file-path (car pair))
-             (new-filename (cdr pair))
-             (file-contents (with-temp-buffer
-                              (insert-file-contents file-path)
-                              (buffer-string)))
-             (base64-data (base64-encode-string file-contents t)))
+;;; Via filesystem
+
+(defvar org-anki--media-dir nil)
+(defun org-anki--ensure-media-dir (&rest force)
+  ;; :: IO ()
+  "If not present, get Anki media dir path from AnkiConnect and save it to org-anki--media-dir"
+  (if (or (not (stringp org-anki--media-dir)) force)
+      (progn
+        (org-anki--report "Anki media dir not set, querying it..")
         (org-anki-connect-request
-         (org-anki--body
-          "storeMediaFile"
-          `(("filename" . ,new-filename)
-            ("data" . ,base64-data)))
-         (lambda (_result) (org-anki--report "File uploaded: %s" new-filename))
-         (lambda (error) (org-anki--report-error "File upload error: %s" error)))
-        ;; Replace the link in content
-        (setq content (string-replace (format "[[file:%s]]" file-path)
-                                      (format "[[file:%s]]" new-filename)
-                                      content)))))
-  content)
+         (org-anki--body "getMediaDirPath")
+         (lambda (dir)
+           (org-anki--report "Anki media dir gotten: %s" dir)
+           (setq org-anki--media-dir dir))
+         (lambda (err) (org-anki--report-error "Failed to get media directory of Anki %s" err))
+         :sync t))))
+
+(defun org-anki--copy-files (file-pairs html-in)
+  (org-anki--ensure-media-dir)
+  (if file-pairs (org-anki--debug "Adding files by copying them to media folder via the filesystem"))
+  (--reduce-from
+   (-let* (((from-pat to-pat file-path new-filename) it)
+           (to-path (concat org-anki--media-dir "/" new-filename)))
+     (org-anki--report "cp %s %s" file-path to-path)
+     (delete-file to-path)
+     ;; ^ SOMEDAY-MAYBE: Files with no write permission throw an
+     ;; error when being overwritten, so delete them first.
+     (copy-file file-path to-path t)
+     (string-replace from-pat to-pat acc))
+   html-in
+   file-pairs))
+
+;;; Via HTTP
+
+(defun org-anki--upload-file (name contents)
+  (let ((base64-data (base64-encode-string contents t)))
+    (org-anki-connect-request
+     (org-anki--body
+      "storeMediaFile"
+      `(("filename" . ,name)
+        ("data" . ,base64-data)))
+     (lambda (_result) (org-anki--report "File uploaded: %s" name))
+     (lambda (error) (org-anki--report-error "File upload error: %s" error)))))
+
+(defun org-anki--upload-files (file-pairs html-in)
+  "Find image links in CONTENT, replacing them with hashed filenames and uploading the images to Anki."
+  (if file-pairs (org-anki--debug "Adding files by uploading them via AnkiConnect HTTP API"))
+  (--reduce-from
+   (-let* (((from-pat to-pat file-path new-filename) it)
+           (to-path (concat org-anki--media-dir "/" new-filename))
+           (file-contents (with-temp-buffer
+                            (insert-file-contents file-path)
+                            (buffer-string))))
+     (org-anki--upload-file new-filename file-contents)
+     (string-replace from-pat to-pat acc))
+   html-in
+   file-pairs))
+
+;; Note
 
 (defun org-anki--note-at-point ()
   "Create an Anki note from whereever the cursor is"
@@ -348,10 +406,10 @@ Returns a list of pairs of found file-paths and replacements."
 
 ;;; JSON payloads
 
-(defun org-anki--body (action params)
+(defun org-anki--body (action &optional params)
   "Wrap ACTION and PARAMS to a json payload AnkiConnect expects."
   `(("action" . ,action)
-    ("params" . ,params)))
+    ,@(if params `(("params" . ,params)))))
 
 (defun org-anki--create-note-single (note)
   "Create an `addNote' json structure to be added to DECK with
@@ -434,12 +492,18 @@ be removed from the Anki app, return actions that do that."
     (substring-no-properties str 0 (length str))))
 
 (defun org-anki--org-to-html (string)
+  ;; :: Org -> Html
   "Convert STRING (org element heading or content) to html."
   (save-excursion
-    (when org-anki-upload-images
-      (setq string (org-anki--process-file-links string)))
-    (org-anki--string-to-anki-mathjax
-     (org-export-string-as string 'html t '(:with-toc nil)))))
+    (let*
+        ((html (org-anki--string-to-anki-mathjax (org-export-string-as string 'html t '(:with-toc nil))))
+         (file-pairs (org-anki--collect-file-links html))
+         (converter
+          (cond
+           ((equal org-anki-media-method 'filesystem) 'org-anki--copy-files)
+           ((equal org-anki-media-method 'http) 'org-anki--upload-files)
+           (t (user-error "`org-anki-media-method` set incorrectly")))))
+      (funcall converter file-pairs html))))
 
 (defun org-anki--report-error (format &rest args)
   "FORMAT the ERROR and prefix it with `org-anki error'."
