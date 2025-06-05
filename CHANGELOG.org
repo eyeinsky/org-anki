@@ -1,3 +1,6 @@
+* v4.0.1
+- make deck import work for non-herestring supporting shell: customize
+  the variable =org-anki-html-to-org= to =org-anki--html-to-org-via-tempfile=
 * v4.0.0
 - support syncing media from file links
 * v3.4.2
