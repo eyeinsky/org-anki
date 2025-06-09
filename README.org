@@ -73,8 +73,7 @@ lose their scheduling information.
 - =org-anki-hierarchical-tags-separator= :: set tag hierarchy
   separator. This is converted to/from =::= when syncing entries
   between org and Anki. By default this is set to "off" with =nil=.
-- =org-anki-upload-images= :: set to =t= to sync file content from
-  file links to Anki as well. Default is =nil=.
+- =org-anki-media-method= :: set to ='http= to upload files via AnkiConnect's HTTP API, defaults to ='filesystem=.
 ** FAQ
 *** How to only sync entries with certain tag?
 =org-anki-sync-all= would by default sync all org entries in the
