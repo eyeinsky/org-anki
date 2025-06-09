@@ -232,7 +232,7 @@ with result."
 
 ;; Note
 
-(cl-defstruct org-anki--note maybe-id fields tags deck type point)
+(cl-defstruct org-anki--note maybe-id fields tags deck type buffer point)
 
 (defun org-anki--string-to-anki-mathjax (latex-code)
   ;; :: String -> String
@@ -343,7 +343,7 @@ of found file-paths and replacements."
 ;; Note
 
 (defun org-anki--note-at-point ()
-  "Create an Anki note from whereever the cursor is"
+  "Create an Anki note from wherever the cursor is."
   ;; :: IO Note
   (-let*
       ((maybe-id (org-entry-get nil org-anki-prop-note-id))
@@ -361,6 +361,7 @@ of found file-paths and replacements."
      :tags     tags
      :deck     deck
      :type     type
+     :buffer   (current-buffer)
      :point    note-start)))
 
 (defun org-anki--get-fields (type)
@@ -631,9 +632,11 @@ be removed from the Anki app, return actions that do that."
       (cond
        ;; added note
        ((equal "addNote" action-value)
-        (save-excursion
-          (goto-char (org-anki--note-point note))
-          (org-set-property org-anki-prop-note-id (number-to-string result))))
+        (with-current-buffer (or (org-anki--note-buffer note)
+                                 (current-buffer))
+          (save-excursion
+            (goto-char (org-anki--note-point note))
+            (org-set-property org-anki-prop-note-id (number-to-string result)))))
        ;; update note: do nothing but message success
        ((equal "updateNoteFields" action-value)
         (org-anki--report
@@ -678,68 +681,68 @@ be removed from the Anki app, return actions that do that."
   ;; :: [Note] -> IO ()
   "Syncronize NOTES."
 
-  (if notes
-      (promise-chain
-          (org-anki--existing-tags notes)
-        (then
-         (lambda (all-existing-tags)
-           (-let*
-               (
-                ;; Calculate added and updated notes
-                (new-and-existing
-                 (org-anki--partition
-                  (lambda (note)
-                    (cond
-                     ((org-anki--note-maybe-id note) (cons :right note))
-                     (t                              (cons :left note))))
-                  notes))
-                ((new . existing) new-and-existing) ;; [Note]
-                (additions (--map (cons it (org-anki--create-note-single it)) new))      ;; [(Note, Action)]
-                (updates   (--map (cons it (org-anki--update-note-single it)) existing)) ;; [(Note, Action)]
+  (when notes
+    (promise-chain
+        (org-anki--existing-tags notes)
+      (then
+       (lambda (all-existing-tags)
+         (-let*
+             (
+              ;; Calculate added and updated notes
+              (new-and-existing
+               (org-anki--partition
+                (lambda (note)
+                  (cond
+                   ((org-anki--note-maybe-id note) (cons :right note))
+                   (t                              (cons :left note))))
+                notes))
+              ((new . existing) new-and-existing) ;; [Note]
+              (additions (--map (cons it (org-anki--create-note-single it)) new))      ;; [(Note, Action)]
+              (updates   (--map (cons it (org-anki--update-note-single it)) existing)) ;; [(Note, Action)]
 
-                ;; Calculate added and removed tags
-                (notes-and-tag-actions ;; [(Note, [Action])]
-                 (-map
-                  (lambda (note-and-action)
-                    (let* ((note (car note-and-action))
-                           (existing-tags
-                            (cdr (assq (org-anki--note-maybe-id note) all-existing-tags))))
-                      (cons note (org-anki--tag-diff existing-tags note))))
-                  updates))
-                (notes-and-tag-actions2 ;; [(Note, Action)]
-                 (--mapcat
-                  (let ((note (car it))
-                        (actions (cdr it)))
-                    (--map (cons note it) actions))
-                  notes-and-tag-actions)))
+              ;; Calculate added and removed tags
+              (notes-and-tag-actions ;; [(Note, [Action])]
+               (-map
+                (lambda (note-and-action)
+                  (let* ((note (car note-and-action))
+                         (existing-tags
+                          (cdr (assq (org-anki--note-maybe-id note) all-existing-tags))))
+                    (cons note (org-anki--tag-diff existing-tags note))))
+                updates))
+              (notes-and-tag-actions2 ;; [(Note, Action)]
+               (--mapcat
+                (let ((note (car it))
+                      (actions (cdr it)))
+                  (--map (cons note it) actions))
+                notes-and-tag-actions)))
 
-             (if (and (= (length updates) 1) (= (length notes) 1))
+           (if (and (= (length updates) 1) (= (length notes) 1))
 
-                 ;; If there there is only one update, then don't use
-                 ;; multi for that:
-                 (let* ((pair (car updates))
-                        (note (car pair))
-                        (action (cdr pair)))
+               ;; If there is only one update, then don't use
+               ;; multi for that:
+               (let* ((pair (car updates))
+                      (note (car pair))
+                      (action (cdr pair)))
 
-                   (org-anki-connect-request
-                    action
-                    (lambda (_the-result)
-                      (org-anki--report
-                       "note succesfully updated: %s"
-                       (org-anki--note-maybe-id note)))
-                    (lambda (the-error)
-                      (org-anki--report-error
-                       "Couldn't update note, received: %s"
-                       the-error)))
+                 (org-anki-connect-request
+                  action
+                  (lambda (_the-result)
+                    (org-anki--report
+                     "note succesfully updated: %s"
+                     (org-anki--note-maybe-id note)))
+                  (lambda (the-error)
+                    (org-anki--report-error
+                     "Couldn't update note, received: %s"
+                     the-error)))
 
-                   ;; Update tags (if any) for the single note, too:
-                   (if notes-and-tag-actions2
-                       (org-anki--execute-api-actions notes-and-tag-actions2)))
+                 ;; Update tags (if any) for the single note, too:
+                 (if notes-and-tag-actions2
+                     (org-anki--execute-api-actions notes-and-tag-actions2)))
 
-               ;; It's not just one updated note, default to multi
-               (let ((note-action-pairs (-concat additions updates notes-and-tag-actions2))) ;; [(Note, Action)]
-                 (org-anki--execute-api-actions note-action-pairs))))))
-        (promise-catch (lambda (reason) (error reason))))))
+             ;; It's not just one updated note, default to multi
+             (let ((note-action-pairs (-concat additions updates notes-and-tag-actions2))) ;; [(Note, Action)]
+               (org-anki--execute-api-actions note-action-pairs))))))
+      (promise-catch (lambda (reason) (error reason))))))
 
 (defun org-anki--delete-notes_ (notes)
   ;; :: [Note] -> IO ()
@@ -750,9 +753,11 @@ be removed from the Anki app, return actions that do that."
          (lambda (_)
            (-map
             (lambda (note)
-              (save-excursion
-                (goto-char (org-anki--note-point note))
-                (org-delete-property org-anki-prop-note-id)))
+              (with-current-buffer (or (org-anki--note-buffer note)
+                                       (current-buffer))
+                (save-excursion
+                  (goto-char (org-anki--note-point note))
+                  (org-delete-property org-anki-prop-note-id))))
             (reverse notes))
            )
          (lambda (the-error)
@@ -788,7 +793,10 @@ be removed from the Anki app, return actions that do that."
 ;;;###autoload
 (defun org-anki-sync-entry ()
   ;; :: IO ()
-  "Synchronize entry at point."
+  "Synchronize entry at point.
+
+Note: do NOT wrap around this command if you want to sync multi entries simultaneously.
+Call `org-anki--sync-notes' instead, or some notes' anki IDs may be missing."
   (interactive)
   (org-anki--sync-notes (cons (org-anki--note-at-point) nil)))
 
@@ -811,7 +819,7 @@ be removed from the Anki app, return actions that do that."
   (interactive)
   (with-current-buffer (or buffer (buffer-name))
     (org-anki--sync-notes
-     (org-map-entries 'org-anki--note-at-point "ANKI_NOTE_ID<>\"\""))))
+     (org-map-entries 'org-anki--note-at-point (concat org-anki-prop-note-id "<>\"\"")))))
 
 ;;;###autoload
 (defun org-anki-update-dir (&optional prefix dir)
@@ -848,7 +856,7 @@ command by hitting `C-u' first."
     (if (y-or-n-p prompt)
         (with-current-buffer buffer-name_
           (org-anki--delete-notes_
-           (org-map-entries 'org-anki--note-at-point "ANKI_NOTE_ID<>\"\"")))
+           (org-map-entries 'org-anki--note-at-point (concat org-anki-prop-note-id "<>\"\""))))
       (org-anki--no-action))))
 
 ;; Stolen from https://github.com/louietan/anki-editor
@@ -916,7 +924,8 @@ syntax."
        :tags     (append (field 'tags) nil)
        :deck     deck-name
        :type     model-name
-       :point    nil))))
+       :buffer   nil
+       :point nil))))
 
 (defun org-anki--html-to-org (html)
   (if html
