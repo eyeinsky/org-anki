@@ -271,7 +271,7 @@ of found file-paths and replacements."
                  (from-pat (match-string 0))  ; the entire match
                  (file-path (match-string 4))); verbatim path/to/file, no protoco
             (if (member protocol '("file://" nil))
-                (let* ((inode (file-attribute-inode-number (file-attributes file-path)))
+                (when-let* ((inode (file-attribute-inode-number (file-attributes file-path)))
                        (basename0 (file-name-nondirectory file-path))
                        ;; ^ SOMEDAY-MAYBE: Filenames containing hashes don't play nor
                        ;; sync with Anki, so replace them.
