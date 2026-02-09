@@ -3,7 +3,7 @@
 ;; Copyright (C) 2020 Markus Läll
 ;;
 ;; URL: https://github.com/eyeinsky/org-anki
-;; Version: 4.0.2
+;; Version: 4.0.3
 ;; Author: Markus Läll <markus.l2ll@gmail.com>
 ;; Keywords: outlines, flashcards, memory
 ;; Package-Requires: ((emacs "27.1") (request "0.3.2") (dash "2.17") (promise "1.1"))
@@ -271,7 +271,7 @@ of found file-paths and replacements."
                  (from-pat (match-string 0))  ; the entire match
                  (file-path (match-string 4))); verbatim path/to/file, no protoco
             (if (member protocol '("file://" nil))
-                (let* ((inode (file-attribute-inode-number (file-attributes file-path)))
+                (when-let* ((inode (file-attribute-inode-number (file-attributes file-path)))
                        (basename0 (file-name-nondirectory file-path))
                        ;; ^ SOMEDAY-MAYBE: Filenames containing hashes don't play nor
                        ;; sync with Anki, so replace them.
