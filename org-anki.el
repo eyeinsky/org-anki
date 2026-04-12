@@ -232,7 +232,7 @@ with result."
 
 ;; Note
 
-(cl-defstruct org-anki--note maybe-id fields tags deck type point)
+(cl-defstruct org-anki--note maybe-id fields tags deck type point buffer)
 
 (defun org-anki--string-to-anki-mathjax (latex-code)
   ;; :: String -> String
@@ -361,7 +361,8 @@ of found file-paths and replacements."
      :tags     tags
      :deck     deck
      :type     type
-     :point    note-start)))
+     :point    note-start
+     :buffer   (current-buffer))))
 
 (defun org-anki--get-fields (type)
   "Get note field values from entry at point."
@@ -631,9 +632,12 @@ be removed from the Anki app, return actions that do that."
       (cond
        ;; added note
        ((equal "addNote" action-value)
-        (save-excursion
-          (goto-char (org-anki--note-point note))
-          (org-set-property org-anki-prop-note-id (number-to-string result))))
+        (when-let ((buffer (org-anki--note-buffer note)))
+          (when (buffer-live-p buffer)
+            (with-current-buffer buffer
+              (save-excursion
+                (goto-char (org-anki--note-point note))
+                (org-set-property org-anki-prop-note-id (number-to-string result)))))))
        ;; update note: do nothing but message success
        ((equal "updateNoteFields" action-value)
         (org-anki--report
@@ -750,9 +754,12 @@ be removed from the Anki app, return actions that do that."
          (lambda (_)
            (-map
             (lambda (note)
-              (save-excursion
-                (goto-char (org-anki--note-point note))
-                (org-delete-property org-anki-prop-note-id)))
+              (when-let ((buffer (org-anki--note-buffer note)))
+                (when (buffer-live-p buffer)
+                  (with-current-buffer buffer
+                    (save-excursion
+                      (goto-char (org-anki--note-point note))
+                      (org-delete-property org-anki-prop-note-id))))))
             (reverse notes))
            )
          (lambda (the-error)
