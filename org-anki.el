@@ -232,7 +232,7 @@ with result."
 
 ;; Note
 
-(cl-defstruct org-anki--note maybe-id fields tags deck type point)
+(cl-defstruct org-anki--note maybe-id fields tags deck type marker)
 
 (defun org-anki--string-to-anki-mathjax (latex-code)
   ;; :: String -> String
@@ -353,7 +353,7 @@ of found file-paths and replacements."
        ((_ . templates) (assoc type org-anki-field-templates))
        (tags (org-anki--get-tags))
        (deck (org-anki--find-prop org-anki-prop-deck org-anki-default-deck))
-       (note-start (point)))
+       (marker (point-marker)))
 
     (make-org-anki--note
      :maybe-id (if (stringp maybe-id) (string-to-number maybe-id))
@@ -361,7 +361,10 @@ of found file-paths and replacements."
      :tags     tags
      :deck     deck
      :type     type
-     :point    note-start)))
+     :marker   marker)))
+
+(defun save-excursion-to (marker &rest body)
+  `(save-excursion (goto-char ,marker) ,@body))
 
 (defun org-anki--get-fields (type)
   "Get note field values from entry at point."
@@ -613,10 +616,6 @@ be removed from the Anki app, return actions that do that."
         ((equal label :right) `(,lefts . ,(cons value rights))))))
    list '(nil . nil)))
 
-(defun org-anki--get-point (note-action-result)
-  ;; :: ((Note, Action), Result) -> Point
-  (org-anki--note-point (car (car note-action-result))))
-
 (defun org-anki--handle-pair (pair)
   ;; :: ((Note, Action), Result) -> IO ()
   (-let*
@@ -631,9 +630,9 @@ be removed from the Anki app, return actions that do that."
       (cond
        ;; added note
        ((equal "addNote" action-value)
-        (save-excursion
-          (goto-char (org-anki--note-point note))
+        (save-excursion-to (org-anki--note-marker note)
           (org-set-property org-anki-prop-note-id (number-to-string result))))
+
        ;; update note: do nothing but message success
        ((equal "updateNoteFields" action-value)
         (org-anki--report
@@ -661,14 +660,8 @@ be removed from the Anki app, return actions that do that."
      (lambda (the-result)
        (let*
            ((result-list (append the-result nil))
-            (pairs (-zip-lists note-action-pairs result-list))
-            (sorted
-             (-sort
-              (lambda (a b)
-                (> (org-anki--get-point a) (org-anki--get-point b)))
-              pairs))
-            )
-         (-map 'org-anki--handle-pair sorted)))
+            (pairs (-zip-lists note-action-pairs result-list)))
+         (-map 'org-anki--handle-pair pairs)))
      (lambda (the-error)
        (org-anki--report-error
         "Couldn't update note, received: %s"
@@ -750,8 +743,7 @@ be removed from the Anki app, return actions that do that."
          (lambda (_)
            (-map
             (lambda (note)
-              (save-excursion
-                (goto-char (org-anki--note-point note))
+              (save-excursion-to (org-anki--note-marker note)
                 (org-delete-property org-anki-prop-note-id)))
             (reverse notes))
            )
@@ -916,7 +908,7 @@ syntax."
        :tags     (append (field 'tags) nil)
        :deck     deck-name
        :type     model-name
-       :point    nil))))
+       :marker   nil))))
 
 (defun org-anki--html-to-org (html)
   (if html
