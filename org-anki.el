@@ -363,7 +363,7 @@ of found file-paths and replacements."
      :type     type
      :marker   marker)))
 
-(defun save-excursion-to (marker &rest body)
+(defmacro save-excursion-to (marker &rest body)
   `(save-excursion (goto-char ,marker) ,@body))
 
 (defun org-anki--get-fields (type)
