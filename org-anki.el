@@ -364,7 +364,9 @@ of found file-paths and replacements."
      :marker   marker)))
 
 (defmacro save-excursion-to (marker &rest body)
-  `(save-excursion (goto-char ,marker) ,@body))
+  `(save-excursion
+     (with-current-buffer (marker-buffer ,marker)
+       (goto-char ,marker) ,@body)))
 
 (defun org-anki--get-fields (type)
   "Get note field values from entry at point."
@@ -372,10 +374,10 @@ of found file-paths and replacements."
   ;; :: String -> IO [(Field, Value)]
   (let*
       ((fields (org-anki--get-model-fields type)) ; fields for TYPE
-       (found nil) ; init property list from field to value
-       (found-fields nil) ; init list for found fields
+       (found nil)            ; init property list from field to value
+       (found-fields nil)     ; init list for found fields
        (level (+ 1 (org-current-level)))) ; subentry level
-    (org-map-entries ; try to find fields from subheadings
+    (org-map-entries             ; try to find fields from subheadings
      (lambda ()
        (let ((title (org-entry-get nil "ITEM")))
          (if (and (= level (org-current-level)) (member title fields))
