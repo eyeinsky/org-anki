@@ -6,6 +6,15 @@ Works via [[https://foosoft.net/projects/anki-connect/][AnkiConnect]] add-on to 
 Features deck import via =org-anki-import-deck= (requires pandoc for
 converting html to org).
 
+** Field discovery
+Import reads field names, values, and order directly from AnkiConnect's
+=notesInfo= response. Custom note types require no import configuration.
+
+Synchronization queries =modelFieldNames= once per model per operation.
+=org-anki-model-fields= now defaults to =nil=; existing explicit entries
+(and entries added with =org-anki-add-model=) remain synchronization
+overrides. AnkiConnect must be available for automatic discovery.
+
 ** How
 Creates "Basic" or "Cloze" type notes.
 

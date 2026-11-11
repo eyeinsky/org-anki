@@ -70,15 +70,11 @@ See help for `org-map-entries` for how it's used."
   :type '(string)
   :group 'org-anki)
 
-(defcustom org-anki-model-fields
-  '(("Basic" "Front" "Back")
-    ("Basic (and reversed card)" "Front" "Back")
-    ("Basic (optional reversed card)" "Front" "Back")
-    ("NameDescr" "Name" "Descr")
-    ("Cloze" "Text" "Extra"))
-  "Default fields for note types.
-
-Each one is a list, the first item is the model name and the rest are field names."
+(defcustom org-anki-model-fields nil
+  "Optional field overrides for note types during synchronization.
+Each entry contains the model name followed by its ordered field names.
+Models without an override are queried from AnkiConnect.  Import always
+uses the fields returned by notesInfo, independently of these overrides."
   :type '(repeat (list (repeat string)))
   :group 'org-anki)
 
@@ -754,13 +750,26 @@ be removed from the Anki app, return actions that do that."
             "org-anki-delete-all error: %s"
             the-error))))))
 
+(defvar org-anki--model-fields-cache nil
+  "Hash table of discovered fields, bound during synchronization.")
+
 (defun org-anki--get-model-fields (model)
-  ;; :: String -> [FieldName]
-  (let ((fields (cdr (assoc model org-anki-model-fields))))
-    (unless fields
-      (error "No fields for '%s', please customize `org-anki-model-fields'."
-             model))
-    fields))
+  "Get ordered field names for MODEL, honoring configured overrides."
+  (or (cdr (assoc model org-anki-model-fields))
+      (and org-anki--model-fields-cache
+           (gethash model org-anki--model-fields-cache))
+      (let (fields failure)
+        (org-anki-connect-request
+         (org-anki--body "modelFieldNames" `(("modelName" . ,model)))
+         (lambda (result) (setq fields (append result nil)))
+         (lambda (reason) (setq failure reason))
+         :sync t)
+        (unless fields
+          (error "Cannot retrieve fields for '%s': %s"
+                 model (or failure "AnkiConnect returned no fields")))
+        (when org-anki--model-fields-cache
+          (puthash model fields org-anki--model-fields-cache))
+        fields)))
 
 (defun org-anki--note-complete (note)
   ;; :: Note -> Bool
@@ -784,7 +793,8 @@ be removed from the Anki app, return actions that do that."
   ;; :: IO ()
   "Synchronize entry at point."
   (interactive)
-  (org-anki--sync-notes (cons (org-anki--note-at-point) nil)))
+  (let ((org-anki--model-fields-cache (make-hash-table :test #'equal)))
+    (org-anki--sync-notes (cons (org-anki--note-at-point) nil))))
 
 ;;;###autoload
 (defun org-anki-sync-all (&optional buffer)
@@ -792,11 +802,12 @@ be removed from the Anki app, return actions that do that."
   "Syncronize all entries in optional BUFFER."
   (interactive)
   (with-current-buffer (or buffer (buffer-name))
-    (org-anki--sync-notes
-     (-filter
-      'org-anki--note-complete
-      (org-map-entries
-       'org-anki--note-at-point (org-anki--get-match) nil org-anki-skip-function)))))
+    (let ((org-anki--model-fields-cache (make-hash-table :test #'equal)))
+      (org-anki--sync-notes
+       (-filter
+	'org-anki--note-complete
+	(org-map-entries
+	 'org-anki--note-at-point (org-anki--get-match) nil org-anki-skip-function))))))
 
 ;;;###autoload
 (defun org-anki-update-all (&optional buffer)
@@ -804,8 +815,9 @@ be removed from the Anki app, return actions that do that."
   "Updates all entries having ANKI_NOTE_ID property in BUFFER."
   (interactive)
   (with-current-buffer (or buffer (buffer-name))
-    (org-anki--sync-notes
-     (org-map-entries 'org-anki--note-at-point "ANKI_NOTE_ID<>\"\""))))
+    (let ((org-anki--model-fields-cache (make-hash-table :test #'equal)))
+      (org-anki--sync-notes
+       (org-map-entries 'org-anki--note-at-point "ANKI_NOTE_ID<>\"\"")))))
 
 ;;;###autoload
 (defun org-anki-update-dir (&optional prefix dir)
@@ -882,28 +894,22 @@ syntax."
 
 ;; Import
 
-(defun org-anki--get-json-field-value (key fields)
-  (let ((maybe-value (assoc key fields)))
-    (org-anki--debug "MAYBE-VALUE %s" maybe-value)
-    (cdr (assoc 'value (cdr maybe-value)))))
-
-;;; Convert JSON to (("FieldName" . "FieldValue") ..)
-(defun org-anki--json-to-fields (fields-json model-fields)
-  (--map
-   (let ((value-html
-          (format
-           "%s"
-           (org-anki--get-json-field-value (intern it) fields-json))))
-    (cons it (funcall org-anki-html-to-org value-html)))
-   model-fields))
+(defun org-anki--json-to-fields (fields-json)
+  "Convert FIELDS-JSON to Org fields in Anki's field order."
+  (mapcar
+   (lambda (field)
+     (cons (if (symbolp (car field)) (symbol-name (car field)) (car field))
+           (funcall org-anki-html-to-org (alist-get 'value (cdr field)))))
+   (sort (copy-sequence fields-json)
+         (lambda (a b)
+           (< (alist-get 'order (cdr a)) (alist-get 'order (cdr b)))))))
 
 (defun org-anki--parse-note (note-json deck-name)
   (cl-flet ((field (lambda (symbol &optional assoc-list)
                      (cdr (assoc symbol (or assoc-list note-json))))))
     (let*
         ((model-name (field 'modelName))
-         (model-fields (org-anki--get-model-fields model-name))
-         (fields (org-anki--json-to-fields (field 'fields) model-fields)))
+         (fields (org-anki--json-to-fields (field 'fields))))
       (make-org-anki--note
        :maybe-id (field 'noteId)
        :fields   fields
