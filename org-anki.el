@@ -981,7 +981,8 @@ then on will be used as source-of-truth for the notes.
 Pandoc is required to be installed."
 
   (interactive "sDeck name: ")
-  (with-current-buffer (or buffer (buffer-name))
+  (let ((destination (with-current-buffer (or buffer (current-buffer))
+                       (point-marker))))
     (org-anki-connect-request
      (org-anki--body
       "findNotes"
@@ -990,11 +991,12 @@ Pandoc is required to be installed."
        (org-anki-connect-request
         (org-anki--body "notesInfo" `(("notes" . ,ids)))
         (lambda (the-result)
-          (insert (format "\n#+%s: %s\n\n" org-anki-prop-deck name))
-          (mapc
-           (lambda (json)
-             (org-anki--write-note (org-anki--parse-note json name)))
-           the-result))
+          (save-excursion-to destination
+            (insert (format "\n#+%s: %s\n\n" org-anki-prop-deck name))
+            (mapc
+             (lambda (json)
+               (org-anki--write-note (org-anki--parse-note json name)))
+             the-result)))
         (lambda (the-error)
           (org-anki--report-error "Get deck error, received: %s" the-error))))
      (lambda (the-error)
