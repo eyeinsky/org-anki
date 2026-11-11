@@ -1,0 +1,27 @@
+;;; org-anki-import-destination-test.el -*- lexical-binding: t; -*-
+(require 'ert)
+(require 'ox-html)
+(require 'org-anki)
+
+(ert-deftest org-anki-import-retains-buffer-and-position ()
+  (let (callbacks)
+    (cl-letf (((symbol-function 'org-anki-connect-request)
+               (lambda (_body success _failure &rest _)
+                 (push success callbacks)))
+              ((symbol-function 'org-anki--parse-note)
+               (lambda (json _deck) json))
+              ((symbol-function 'org-anki--write-note)
+               (lambda (_note) (insert "IMPORTED\n"))))
+      (with-temp-buffer
+        (org-mode)
+        (insert "Before\nAfter\n")
+        (goto-char 8)
+        (let ((destination (current-buffer)))
+          (org-anki-import-deck "Deck" destination)
+          (goto-char (point-max))
+          (with-temp-buffer
+            (funcall (pop callbacks) [42])
+            (funcall (pop callbacks) [note])
+            (should (string-empty-p (buffer-string))))
+          (should (equal (buffer-string)
+                         "Before\n\n#+ANKI_DECK: Deck\n\nIMPORTED\nAfter\n")))))))
