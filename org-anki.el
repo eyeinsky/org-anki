@@ -156,6 +156,14 @@ very slow."
   :type '(function)
   :group 'org-anki)
 
+(defcustom org-anki-import-note-format 'compact
+  "Layout used when importing notes.
+With `compact', retain the heading/body layout for single-line fronts.
+With `fields', use the note ID as heading and every field as a child."
+  :type '(choice (const :tag "Compact (existing behavior)" compact)
+                 (const :tag "Note ID and field headings" fields))
+  :group 'org-anki)
+
 ;; Stolen code
 
 ;; Get list of global properties
@@ -762,10 +770,24 @@ be removed from the Anki app, return actions that do that."
              model))
     fields))
 
+(defun org-anki--field-entry-p ()
+  "Whether this entry is a named field of its parent note."
+  (and (not (org-entry-get nil org-anki-prop-note-id))
+       (let ((title (org-entry-get nil "ITEM")))
+         (save-excursion
+           (and (org-up-heading-safe)
+                (member title
+                        (org-anki--get-model-fields
+                         (org-anki--find-prop
+                          org-anki-note-type org-anki-default-note-type))))))))
+
 (defun org-anki--note-complete (note)
   ;; :: Note -> Bool
-  "Test if all fields of a NOTE have values (i.e, are not nil)"
-  (equal nil (rassq "" (org-anki--note-fields note))))
+  "Whether NOTE has fields with string values, including empty strings."
+  (and note
+       (org-anki--note-fields note)
+       (cl-every (lambda (field) (stringp (cdr field)))
+                 (org-anki--note-fields note))))
 
 ;; Public API
 
@@ -793,10 +815,16 @@ be removed from the Anki app, return actions that do that."
   (interactive)
   (with-current-buffer (or buffer (buffer-name))
     (org-anki--sync-notes
-     (-filter
-      'org-anki--note-complete
-      (org-map-entries
-       'org-anki--note-at-point (org-anki--get-match) nil org-anki-skip-function)))))
+     (-filter #'org-anki--note-complete
+              (org-map-entries
+               (lambda ()
+                 (if (org-anki--field-entry-p)
+                     (progn
+                       (setq org-map-continue-from
+                             (save-excursion (org-end-of-subtree t) (point)))
+                       nil)
+                   (org-anki--note-at-point)))
+               (org-anki--get-match) nil org-anki-skip-function)))))
 
 ;;;###autoload
 (defun org-anki-update-all (&optional buffer)
@@ -954,6 +982,12 @@ syntax."
   (string-search "\n" (cdr (car fields))))
 
 (defun org-anki--write-note (note)
+  "Insert NOTE using `org-anki-import-note-format'."
+  (if (eq org-anki-import-note-format 'fields)
+      (org-anki--write-note-fields note)
+    (org-anki--write-note-compact note)))
+
+(defun org-anki--write-note-compact (note)
   (let ((fields (org-anki--note-fields note)))
     (if (org-anki--multiline-front fields)
         ;; Note with multiline front
@@ -969,6 +1003,31 @@ syntax."
         (org-anki--write-note-properties note)
         (insert back)
         (insert "\n")))))
+
+(defun org-anki--write-note-fields (note)
+  "Insert NOTE with its ID as heading and every field as a child."
+  (insert (format "* %s" (org-anki--note-maybe-id note)))
+  (org-anki--write-note-properties note)
+  (org-entry-put nil org-anki-note-type (org-anki--note-type note))
+  ;; Property insertion can move point; append fields after the drawer.
+  (org-end-of-subtree t t)
+  (dolist (field (org-anki--note-fields note))
+    (insert (format "\n** %s\n%s\n" (car field)
+                    (org-anki--nest-field-content (cdr field))))))
+
+(defun org-anki--nest-field-content (content)
+  "Place headings in CONTENT below a level-two field heading."
+  (with-temp-buffer
+    (insert content)
+    (org-mode)
+    ;; Use the Org parser so stars inside source blocks remain untouched.
+    (let ((positions (org-element-map (org-element-parse-buffer) 'headline
+                       (lambda (headline)
+                         (org-element-property :begin headline)))))
+      (dolist (position (reverse positions))
+        (goto-char position)
+        (insert "**")))
+    (buffer-string)))
 
 ;;;###autoload
 (defun org-anki-import-deck (name &optional buffer)
