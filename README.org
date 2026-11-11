@@ -6,6 +6,21 @@ Works via [[https://foosoft.net/projects/anki-connect/][AnkiConnect]] add-on to 
 Features deck import via =org-anki-import-deck= (requires pandoc for
 converting html to org).
 
+** Structured imports
+To import every note with its ID as the heading and one child heading
+per field, set:
+
+#+begin_src elisp
+(customize-set-variable 'org-anki-import-note-format 'fields)
+#+end_src
+
+Fields retain their order and empty values. The note ID and model are
+stored as properties, and headings within field content are nested below
+the field heading. =org-anki-sync-all= skips field subtrees as separate
+notes while including their contents in the parent note.
+
+The default, =compact=, preserves the existing import layout.
+
 ** How
 Creates "Basic" or "Cloze" type notes.
 
